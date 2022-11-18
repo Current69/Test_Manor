@@ -19,6 +19,7 @@ Wwise/*.akpk
 Wwise/*.prof
 Wwise/*.validationcache
 Wwise/*.wsettings
+Wwise/*.a
 
 # Fmod Project
 FMOD/.user/
