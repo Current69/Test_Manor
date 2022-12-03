@@ -1,16 +1,18 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
-Copyright (c) 2021 Audiokinetic Inc.
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
+Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
 #pragma once
@@ -49,7 +51,7 @@ struct FAkGeometrySurfaceOverride
 
 	/** Enable Transmission Loss Override */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, DisplayName = "Enable Transmission Loss Override", Category = "Geometry")
-	uint32 bEnableOcclusionOverride : 1;
+	bool bEnableOcclusionOverride = false;
 
 	/** Transmission loss value to set when modeling sound transmission through geometry. Transmission is modeled only when there is no direct line of sight from the emitter to the listener.
 	* If there is more than one surface between the emitter and the listener, the maximum of each surface's transmission loss value is used. If the emitter and listener are in different rooms, the room's transmission loss value is taken into account.
@@ -104,11 +106,11 @@ public:
 	virtual void OnComponentDestroyed(bool bDestroyingHierarchy) override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Geometry")
-	AkMeshType MeshType;
+	AkMeshType MeshType = AkMeshType::CollisionMesh;
 
 	/** The Static Mesh's LOD to use */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Geometry", meta = (ClampMin = "0.0"))
-	int LOD;
+	int LOD = 0;
 
 	/** The local distance in Unreal units between two vertices to be welded together.
 	* Any two vertices closer than this threshold will be treated as the same unique vertex and assigned the same position.
@@ -116,7 +118,7 @@ public:
 	* Increasing this threshold also helps Spatial Audio's edge-finding algorithm to find more valid diffraction edges.
 	*/
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Geometry", meta = (ClampMin = "0.0"))
-	float WeldingThreshold;
+	float WeldingThreshold = .0f;
 
 	/** Override the acoustic properties of this mesh per material.*/
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Geometry", DisplayName = "Acoustic Properties Override")
@@ -128,11 +130,11 @@ public:
 
 	/** Enable or disable geometric diffraction for this mesh. Check this box to have Wwise Spatial Audio generate diffraction edges on the geometry. The diffraction edges will be visible in the Wwise game object viewer when connected to the game. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Geometry")
-	uint32 bEnableDiffraction : 1;
+	bool bEnableDiffraction = false;
 
 	/** Enable or disable geometric diffraction on boundary edges for this Geometry. Boundary edges are edges that are connected to only one triangle. Depending on the specific shape of the geometry, boundary edges may or may not be useful and it is beneficial to reduce the total number of diffraction edges to process.  */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Geometry", meta = (EditCondition = "bEnableDiffraction"))
-	uint32 bEnableDiffractionOnBoundaryEdges : 1;
+	bool bEnableDiffractionOnBoundaryEdges = false;
 
 	/** (Optional) Associate this Surface Reflector Set with a Room.
 	* Associating a spatial audio geometry with a particular room will limit the scope in which the geometry is visible/accessible. Leave it to None and this geometry will have a global scope.
@@ -140,7 +142,7 @@ public:
 	* Take note that once one or more geometry sets are associated with a room, that room will no longer be able to access geometry that is in the global scope.
 	*/
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Geometry")
-	AActor* AssociatedRoom;
+	AActor* AssociatedRoom = nullptr;
 
 	float GetSurfaceAreaSquaredMeters(const int& surfaceIndex) const;
 

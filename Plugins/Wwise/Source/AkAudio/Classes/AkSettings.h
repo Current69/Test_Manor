@@ -1,27 +1,31 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
-Copyright (c) 2021 Audiokinetic Inc.
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
+Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
 #pragma once
 
+#include "AkAcousticTexture.h"
 #include "Engine/EngineTypes.h"
 #include "PhysicalMaterials/PhysicalMaterial.h"
-#include "AssetRegistryModule.h"
+#include "AssetRegistry/AssetRegistryModule.h"
 #include "AkUEFeatures.h"
 #include "AkRtpc.h"
 #include "AkSettings.generated.h"
 
+class UAkInitBank;
 class UAkAcousticTexture;
 
 DECLARE_MULTICAST_DELEGATE(FOnSoundBanksPathChangedDelegate);
@@ -52,6 +56,23 @@ struct FAkGeometrySurfacePropertiesToMap
 	
 	UPROPERTY(EditAnywhere, DisplayName = "Transmission Loss", Category = "AkGeometry Surface Properties Map", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float OcclusionValue = 1.f;
+
+	bool operator==(const FAkGeometrySurfacePropertiesToMap& Rhs) const
+	{
+		if (OcclusionValue != Rhs.OcclusionValue)
+		{
+			return false;
+		}
+		if (!AcousticTexture.IsValid() != !Rhs.AcousticTexture.IsValid())
+		{
+			return false;
+		}
+		if (!AcousticTexture.IsValid())
+		{
+			return true;
+		}
+		return AcousticTexture->GetFName() == Rhs.AcousticTexture->GetFName();
+	}
 };
 
 struct AkGeometrySurfaceProperties
@@ -138,7 +159,7 @@ public:
 	bool bProjectMigrated = false;
 
 	UPROPERTY(Config)
-	bool bAutoConnectToWAAPI_DEPRECATED;
+	bool bAutoConnectToWAAPI_DEPRECATED = false;
 
 	// Default value for Occlusion Collision Channel when creating a new Ak Component.
 	UPROPERTY(Config, EditAnywhere, Category = "Occlusion")
@@ -150,11 +171,11 @@ public:
 
 	// PhysicalMaterial to AcousticTexture and Occlusion Value Map
 	UPROPERTY(Config, EditAnywhere, EditFixedSize, Category = "AkGeometry Surface Properties Map")
-	TMap<TSoftObjectPtr<class UPhysicalMaterial>, FAkGeometrySurfacePropertiesToMap> AkGeometryMap;
+	TMap<TSoftObjectPtr<UPhysicalMaterial>, FAkGeometrySurfacePropertiesToMap> AkGeometryMap;
 
 	// Global surface absorption value to use when estimating environment decay value. Acts as a global scale factor for the decay estimations. Defaults to 0.5.
 	UPROPERTY(Config, EditAnywhere, Category = "Reverb Assignment Map", meta = (ClampMin = 0.1f, ClampMax = 1.0f, UIMin = 0.1f, UIMax = 1.0f))
-	float GlobalDecayAbsorption;
+	float GlobalDecayAbsorption = .5f;
 
 	// Default reverb aux bus to apply to rooms
 	UPROPERTY(Config, EditAnywhere, Category = "Reverb Assignment Map")
@@ -191,7 +212,7 @@ public:
 
 	// When generating the event data, the media contained in switch containers will be splitted by state/switch value
 	// and only loaded if the state/switch value are currently loaded
-	UPROPERTY(Config, meta = (Deprecated, DepricationMessage="Setting now exists for each AK Audio Event"))
+	UPROPERTY(Config, meta = (Deprecated, DeprecationMessage="Setting now exists for each AK Audio Event"))
 	bool SplitSwitchContainerMedia = false;
 
 	//Deprecated in 2022.1
@@ -214,6 +235,10 @@ public:
 	// When an asset is dragged from the Wwise / Waapi pickers, assets are created by default in this path.
 	UPROPERTY(Config, EditAnywhere, Category = "Asset Creation")
 	FString DefaultAssetCreationPath = "/Game/WwiseAudio";
+
+	// The unique Init Bank for the Wwise project. This contains the basic information necessary for properly setting up the SoundEngine.
+	UPROPERTY(Config, EditAnywhere, Category = "Initialization")
+	TSoftObjectPtr<UAkInitBank> InitBank;
 
 	UPROPERTY(Config)
 	bool AskedToUseNewAssetManagement_DEPRECATED = false;
@@ -246,6 +271,10 @@ public:
 	bool GetAssociatedOcclusionValue(const UPhysicalMaterial* physMaterial, float& occlusionValue) const;
 
 #if WITH_EDITOR
+	bool UpdateGeneratedSoundBanksPath();
+	bool UpdateGeneratedSoundBanksPath(FString Path);
+	bool GeneratedSoundBanksPathExists() const;
+	bool AreSoundBanksGenerated() const;
 #if AK_SUPPORT_WAAPI
 	/** This needs to be called after the waapi client has been initialized, which happens after AkSettings is constructed. */
 	void InitWaapiSync();
@@ -316,8 +345,9 @@ public:
 	void UpdateTextureParams(const FGuid& textureID);
 	/** Use WAAPI to query the color for a given texture and Update the corresponding UAkAcousticTexture asset. */
 	void UpdateTextureColor(const FGuid& textureID);
-	mutable AcousticTextureParamsChanged OnTextureParamsChanged;
 #endif // AK_SUPPORT_WAAPI
+	mutable AcousticTextureParamsChanged OnTextureParamsChanged;
+
 #endif // WITH_EDITOR
 
 #if WITH_EDITORONLY_DATA

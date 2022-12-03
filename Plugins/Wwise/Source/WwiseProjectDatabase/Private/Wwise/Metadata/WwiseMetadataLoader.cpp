@@ -1,15 +1,17 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
 Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
@@ -27,21 +29,21 @@ void FWwiseMetadataLoader::Fail(const TCHAR* FieldName)
 	bResult = false;
 }
 
-void FWwiseMetadataLoader::LogParsed(const TCHAR* FieldName, const uint32 Id, const TCHAR* Name)
+void FWwiseMetadataLoader::LogParsed(const TCHAR* FieldName, const uint32 Id, const FName Name)
 {
 	if (bResult)
 	{
-		if (Id && Name)
+		if (Id && !Name.IsNone())
 		{
-			UE_LOG(LogWwiseProjectDatabase, VeryVerbose, TEXT("Parsed %s [%" PRIu32 "] %s"), FieldName, Id, Name);
+			UE_LOG(LogWwiseProjectDatabase, VeryVerbose, TEXT("Parsed %s [%" PRIu32 "] %s"), FieldName, Id, *Name.ToString());
 		}
 		else if (Id)
 		{
 			UE_LOG(LogWwiseProjectDatabase, VeryVerbose, TEXT("Parsed %s [%" PRIu32 "]"), FieldName, Id);
 		}
-		else if (Name)
+		else if (!Name.IsNone())
 		{
-			UE_LOG(LogWwiseProjectDatabase, VeryVerbose, TEXT("Parsed %s: %s"), FieldName, Name);
+			UE_LOG(LogWwiseProjectDatabase, VeryVerbose, TEXT("Parsed %s: %s"), FieldName, *Name.ToString());
 		}
 		else
 		{
@@ -50,17 +52,17 @@ void FWwiseMetadataLoader::LogParsed(const TCHAR* FieldName, const uint32 Id, co
 	}
 	else 
 	{
-		if (Id && Name)
+		if (Id && !Name.IsNone())
 		{
-			UE_LOG(LogWwiseProjectDatabase, Log, TEXT("... while parsing %s [%" PRIu32 "] %s"), FieldName, Id, Name);
+			UE_LOG(LogWwiseProjectDatabase, Log, TEXT("... while parsing %s [%" PRIu32 "] %s"), FieldName, Id, *Name.ToString());
 		}
 		else if (Id)
 		{
 			UE_LOG(LogWwiseProjectDatabase, Log, TEXT("... while parsing %s [%" PRIu32 "]"), FieldName, Id);
 		}
-		else if (Name)
+		else if (!Name.IsNone())
 		{
-			UE_LOG(LogWwiseProjectDatabase, Log, TEXT("... while parsing %s: %s"), FieldName, Name);
+			UE_LOG(LogWwiseProjectDatabase, Log, TEXT("... while parsing %s: %s"), FieldName, *Name.ToString());
 		}
 		else
 		{
@@ -134,7 +136,7 @@ FGuid FWwiseMetadataLoader::GetGuid(FWwiseMetadataLoadable* Object, const FStrin
 	return Value;
 }
 
-FString FWwiseMetadataLoader::GetString(FWwiseMetadataLoadable* Object, const FString& FieldName, EWwiseRequiredMetadata Required)
+FName FWwiseMetadataLoader::GetString(FWwiseMetadataLoadable* Object, const FString& FieldName, EWwiseRequiredMetadata Required)
 {
 	check(Object);
 	Object->AddRequestedValue(TEXT("string"), FieldName);
@@ -147,7 +149,7 @@ FString FWwiseMetadataLoader::GetString(FWwiseMetadataLoadable* Object, const FS
 	}
 
 	Object->IncLoadedSize(sizeof(Value) + Value.GetAllocatedSize());
-	return Value;
+	return FName(Value);
 }
 
 uint32 FWwiseMetadataLoader::GetUint32(FWwiseMetadataLoadable* Object, const FString& FieldName, EWwiseRequiredMetadata Required)

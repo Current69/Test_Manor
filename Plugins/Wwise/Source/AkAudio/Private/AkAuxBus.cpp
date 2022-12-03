@@ -1,16 +1,18 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
-Copyright (c) 2021 Audiokinetic Inc.
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
+Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
 #include "AkAuxBus.h"
@@ -20,6 +22,7 @@ Copyright (c) 2021 Audiokinetic Inc.
 #include "AkAudioDevice.h"
 
 #if WITH_EDITORONLY_DATA
+#include "Wwise/WwiseProjectDatabase.h"
 #include "Wwise/WwiseResourceCooker.h"
 #endif
 
@@ -27,8 +30,10 @@ Copyright (c) 2021 Audiokinetic Inc.
 void UAkAuxBus::PostLoad()
 {
 	Super::PostLoad();
-
-	LoadAuxBus(false);
+	if (bAutoLoad)
+	{
+		LoadAuxBus();
+	}
 }
 
 void UAkAuxBus::Serialize(FArchive& Ar)
@@ -39,34 +44,33 @@ void UAkAuxBus::Serialize(FArchive& Ar)
 	{
 		return;
 	}
-
+#if !UE_SERVER
 #if WITH_EDITORONLY_DATA
-	auto* ResourceCooker = UWwiseResourceCooker::GetForArchive(Ar);
-	if (UNLIKELY(!ResourceCooker))
+	if (Ar.IsCooking() && Ar.IsSaving())
 	{
-		return;
-	}
-
-	FWwiseLocalizedAuxBusCookedData CookedDataToArchive;
-	if (ResourceCooker->PrepareCookedData(CookedDataToArchive, GetValidatedInfo(AuxBusInfo)))
-	{
+		FWwiseLocalizedAuxBusCookedData CookedDataToArchive;
+		if (auto* ResourceCooker = FWwiseResourceCooker::GetForArchive(Ar))
+		{
+			ResourceCooker->PrepareCookedData(CookedDataToArchive, GetValidatedInfo(AuxBusInfo));
+		}
 		CookedDataToArchive.Serialize(Ar);
 	}
 #else
 	AuxBusCookedData.Serialize(Ar);
 #endif
+#endif
 
 }
 
-void UAkAuxBus::LoadAuxBus(bool bReload)
+void UAkAuxBus::LoadAuxBus()
 {
-	auto* ResourceLoader = UWwiseResourceLoader::Get();
+	auto* ResourceLoader = FWwiseResourceLoader::Get();
 	if (UNLIKELY(!ResourceLoader))
 	{
 		return;
 	}
 
-	if (bReload)
+	if (LoadedAuxBus)
 	{
 		UnloadAuxBus();
 	}
@@ -76,7 +80,13 @@ void UAkAuxBus::LoadAuxBus(bool bReload)
 	{
 		return;
 	}
-	auto* ResourceCooker = UWwiseResourceCooker::GetDefault();
+	auto* ProjectDatabase = FWwiseProjectDatabase::Get();
+	if (!ProjectDatabase || !ProjectDatabase->IsProjectDatabaseParsed())
+	{
+		UE_LOG(LogAkAudio, VeryVerbose, TEXT("UAkAuxBus::LoadAuxBus: Not loading '%s' because project database is not parsed."), *GetName())
+		return;
+	}
+	auto* ResourceCooker = FWwiseResourceCooker::GetDefault();
 	if (UNLIKELY(!ResourceCooker))
 	{
 		return;
@@ -87,20 +97,20 @@ void UAkAuxBus::LoadAuxBus(bool bReload)
 	}
 #endif
 
-	LoadedAuxBusData = ResourceLoader->LoadAuxBus(AuxBusCookedData);
+	LoadedAuxBus = ResourceLoader->LoadAuxBus(AuxBusCookedData);
 }
 
 void UAkAuxBus::UnloadAuxBus()
 {
-	if (LoadedAuxBusData)
+	if (LoadedAuxBus)
 	{
-		auto* ResourceLoader = UWwiseResourceLoader::Get();
+		auto* ResourceLoader = FWwiseResourceLoader::Get();
 		if (UNLIKELY(!ResourceLoader))
 		{
 			return;
 		}
-		ResourceLoader->UnloadAuxBus(LoadedAuxBusData);
-		LoadedAuxBusData=nullptr;
+		ResourceLoader->UnloadAuxBus(MoveTemp(LoadedAuxBus));
+		LoadedAuxBus = nullptr;
 	}
 }
 
@@ -118,14 +128,6 @@ void UAkAuxBus::BeginDestroy()
 	UnloadAuxBus();
 }
 
-#if WITH_EDITOR
-void UAkAuxBus::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
-{
-	Super::PostEditChangeProperty(PropertyChangedEvent);
-	LoadAuxBus(true);
-}
-#endif
-
 #if WITH_EDITORONLY_DATA
 void UAkAuxBus::CookAdditionalFilesOverride(const TCHAR* PackageFilename, const ITargetPlatform* TargetPlatform,
 	TFunctionRef<void(const TCHAR* Filename, void* Data, int64 Size)> WriteAdditionalFile)
@@ -135,13 +137,44 @@ void UAkAuxBus::CookAdditionalFilesOverride(const TCHAR* PackageFilename, const 
 		return;
 	}
 
-	UWwiseResourceCooker* ResourceCooker = UWwiseResourceCooker::GetForPlatform(TargetPlatform);
-	if (UNLIKELY(!ResourceCooker))
+	FWwiseResourceCooker* ResourceCooker = FWwiseResourceCooker::GetForPlatform(TargetPlatform);
+	if (!ResourceCooker)
 	{
 		return;
 	}
 	ResourceCooker->SetSandboxRootPath(PackageFilename);
 
 	ResourceCooker->CookAuxBus(GetValidatedInfo(AuxBusInfo), WriteAdditionalFile);
+}
+
+void UAkAuxBus::FillInfo()
+{
+	auto* ResourceCooker = FWwiseResourceCooker::GetDefault();
+	if (UNLIKELY(!ResourceCooker))
+	{
+		UE_LOG(LogAkAudio, Error, TEXT("UAkAuxBus::FillInfo: ResourceCooker not initialized"));
+		return;
+	}
+
+	auto ProjectDatabase = ResourceCooker->GetProjectDatabase();
+	if (UNLIKELY(!ProjectDatabase))
+	{
+		UE_LOG(LogAkAudio, Error, TEXT("UAkAuxBus::FillInfo: ProjectDatabase not initialized"));
+		return;
+	}
+
+	FWwiseObjectInfo* AudioTypeInfo = &AuxBusInfo;
+	const FWwiseRefAuxBus AudioTypeRef = FWwiseDataStructureScopeLock(*ProjectDatabase).GetAuxBus(
+		GetValidatedInfo(AuxBusInfo));
+
+	if (AudioTypeRef.AuxBusName().IsNone() || !AudioTypeRef.AuxBusGuid().IsValid() || AudioTypeRef.AuxBusId() == AK_INVALID_UNIQUE_ID)
+	{
+		UE_LOG(LogAkAudio, Warning, TEXT("UAkAuxBus::FillInfo: Valid object not found in Project Database"));
+		return;
+	}
+
+	AudioTypeInfo->WwiseName = AudioTypeRef.AuxBusName();
+	AudioTypeInfo->WwiseGuid = AudioTypeRef.AuxBusGuid();
+	AudioTypeInfo->WwiseShortId = AudioTypeRef.AuxBusId();
 }
 #endif

@@ -1,15 +1,17 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
 Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
@@ -32,10 +34,10 @@ public:
 	MakeStruct(
 		const FGuid& AssetGuid,
 		int32 GroupShortId,
-		int32 AssetShortId,
-		const FString& AssetName)
+		int32 WwiseShortId,
+		const FString& WwiseName)
 	{
-		return FWwiseGroupValueInfo(AssetGuid, (uint32)GroupShortId, (uint32)AssetShortId, AssetName);
+		return FWwiseGroupValueInfo(AssetGuid, (uint32)GroupShortId, (uint32)WwiseShortId, FName(WwiseName));
 	}
 
 	UFUNCTION(BlueprintPure, Category = "Wwise|GroupValueInfo", Meta = (BlueprintThreadSafe, DisplayName = "Break GroupValueInfo"))
@@ -44,13 +46,13 @@ public:
 		UPARAM(DisplayName="GroupValue Info") FWwiseGroupValueInfo Ref,
 		FGuid& OutAssetGuid,
 		int32& OutGroupShortId,
-		int32& OutAssetShortId,
-		FString& OutAssetName)
+		int32& OutWwiseShortId,
+		FString& OutWwiseName)
 	{
-		OutAssetGuid = Ref.AssetGuid;
+		OutAssetGuid = Ref.WwiseGuid;
 		OutGroupShortId = (int32)Ref.GroupShortId;
-		OutAssetShortId = (int32)Ref.AssetShortId;
-		OutAssetName = Ref.AssetName;
+		OutWwiseShortId = (int32)Ref.WwiseShortId;
+		OutWwiseName = Ref.WwiseName.ToString();
 	}
 
 	UFUNCTION(BlueprintPure, Category = "Wwise|GroupValue Info", Meta = (BlueprintThreadSafe))
@@ -59,7 +61,7 @@ public:
 	GetAssetGuid(
 		UPARAM(DisplayName="GroupValue Info") const FWwiseGroupValueInfo& Ref)
 	{
-		return Ref.AssetGuid;
+		return Ref.WwiseGuid;
 	}
 	
 	UFUNCTION(BlueprintPure, Category = "Wwise|GroupValue Info", Meta = (BlueprintThreadSafe))
@@ -74,19 +76,19 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Wwise|GroupValue Info", Meta = (BlueprintThreadSafe))
 	static
 	UPARAM(DisplayName="Short Id") int32
-	GetAssetShortId(
+	GetWwiseShortId(
 		UPARAM(DisplayName="GroupValue Info") const FWwiseGroupValueInfo& Ref)
 	{
-		return (int32)Ref.AssetShortId;
+		return (int32)Ref.WwiseShortId;
 	}
 
 	UFUNCTION(BlueprintPure, Category = "Wwise|GroupValue Info", Meta = (BlueprintThreadSafe))
 	static
 	UPARAM(DisplayName="Name") FString
-	GetAssetName(
+	GetWwiseName(
 		UPARAM(DisplayName="GroupValue Info") const FWwiseGroupValueInfo& Ref)
 	{
-		return Ref.AssetName;
+		return Ref.WwiseName.ToString();
 	}
 
 	UFUNCTION(BlueprintPure, Category = "Wwise|GroupValue Info", Meta = (BlueprintThreadSafe))
@@ -97,7 +99,7 @@ public:
 		const FGuid& AssetGuid)
 	{
 		auto Result = Ref;
-		Result.AssetGuid = AssetGuid;
+		Result.WwiseGuid = AssetGuid;
 		return Result;
 	}
 
@@ -116,24 +118,24 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Wwise|GroupValue Info", Meta = (BlueprintThreadSafe))
 	static
 	UPARAM(DisplayName="Struct Out") FWwiseGroupValueInfo
-	SetAssetShortId(
+	SetWwiseShortId(
 		UPARAM(DisplayName="GroupValue Info") const FWwiseGroupValueInfo& Ref,
-		int32 AssetShortId)
+		int32 WwiseShortId)
 	{
 		auto Result = Ref;
-		Result.AssetShortId = AssetShortId;
+		Result.WwiseShortId = WwiseShortId;
 		return Result;
 	}
 
 	UFUNCTION(BlueprintPure, Category = "Wwise|GroupValue Info", Meta = (BlueprintThreadSafe))
 	static
 	UPARAM(DisplayName="Struct Out") FWwiseGroupValueInfo
-	SetAssetName(
+	SetWwiseName(
 		UPARAM(DisplayName="GroupValue Info") const FWwiseGroupValueInfo& Ref,
-		const FString& AssetName)
+		const FString& WwiseName)
 	{
 		auto Result = Ref;
-		Result.AssetName = AssetName;
+		Result.WwiseName = FName(WwiseName);
 		return Result;
 	}
 };

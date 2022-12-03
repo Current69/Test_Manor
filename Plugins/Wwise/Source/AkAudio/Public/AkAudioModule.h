@@ -1,27 +1,28 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
-Copyright (c) 2021 Audiokinetic Inc.
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
+Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
 #pragma once
 
 #include "AkAudioDevice.h"
-#include "SReloadPopup.h"
 #include "Modules/ModuleManager.h"
 #include "Containers/Ticker.h"
 
 /**
- * The public interface to this module.  In most cases, this interface is only public to sibling modules 
+ * The public interface to this module.  In most cases, this interface is only public to sibling modules
  * within this plugin.
  */
 class IAkAudioModule : public IModuleInterface
@@ -53,32 +54,20 @@ public:
 class AKAUDIO_API FAkAudioModule : public IAkAudioModule
 {
 public:
+	static FAkAudioModule* AkAudioModuleInstance;
+	static FSimpleMulticastDelegate OnModuleInitialized;
+	bool bModuleInitialized;
+
 	/** IModuleInterface implementation */
 	virtual void StartupModule() override;
 	virtual void ShutdownModule() override;
 
-	FAkAudioDevice * GetAkAudioDevice();
-#if WITH_EDITOR
-	void AssetReloadPrompt();
-	void OpenAssetReloadPopup();
-	void ReloadWwiseAssetDataAsync();
-	void ReloadWwiseAssetData();
-#endif
-
-	void UpdateWwiseResourceLoaderSettings() const;
+	FAkAudioDevice* GetAkAudioDevice() const;
+	void ReloadWwiseAssetData() const;
+	static void UpdateWwiseResourceLoaderSettings();
 #if WITH_EDITORONLY_DATA
-	void ParseGeneratedSoundBankData() const;
+	static void ParseGeneratedSoundBankData();
 #endif
-
-	static FAkAudioModule* AkAudioModuleInstance;
-
-private:
-	void OnPostEngineInit();
-
-#if WITH_EDITOR
-	void OnSoundBanksFolderChanged();
-#endif
-
 	FAkAudioDevice* AkAudioDevice;
 
 	/** Call to update AkAudioDevice. */
@@ -86,9 +75,5 @@ private:
 
 	/** Handle for OnTick. */
 	FTickerDelegateHandle TickDelegateHandle;
-	FDelegateHandle OnDatabaseUpdateCompleteHandle;
-
-#if WITH_EDITOR
-	SReloadPopup ReloadPopup = SReloadPopup();
-#endif
 };
+

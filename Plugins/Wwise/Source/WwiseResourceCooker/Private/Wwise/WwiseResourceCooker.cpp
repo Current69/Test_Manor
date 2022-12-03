@@ -1,15 +1,17 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
 Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
@@ -22,7 +24,7 @@ Copyright (c) 2022 Audiokinetic Inc.
 
 #include "Async/Async.h"
 
-void UWwiseResourceCooker::CookAuxBus(const FWwiseAssetInfo& InInfo, WriteAdditionalFileFunction WriteAdditionalFile)
+void FWwiseResourceCooker::CookAuxBus(const FWwiseObjectInfo& InInfo, WriteAdditionalFileFunction WriteAdditionalFile)
 {
 	auto* CookingCache = GetCookingCache();
 	if (UNLIKELY(!CookingCache))
@@ -48,7 +50,7 @@ void UWwiseResourceCooker::CookAuxBus(const FWwiseAssetInfo& InInfo, WriteAdditi
 	}
 }
 
-void UWwiseResourceCooker::CookEvent(const FWwiseEventInfo& InInfo, WriteAdditionalFileFunction WriteAdditionalFile)
+void FWwiseResourceCooker::CookEvent(const FWwiseEventInfo& InInfo, WriteAdditionalFileFunction WriteAdditionalFile)
 {
 	auto* CookingCache = GetCookingCache();
 	if (UNLIKELY(!CookingCache))
@@ -74,7 +76,7 @@ void UWwiseResourceCooker::CookEvent(const FWwiseEventInfo& InInfo, WriteAdditio
 	}
 }
 
-void UWwiseResourceCooker::CookExternalSource(uint32 InCookie, WriteAdditionalFileFunction WriteAdditionalFile)
+void FWwiseResourceCooker::CookExternalSource(uint32 InCookie, WriteAdditionalFileFunction WriteAdditionalFile)
 {
 	auto* CookingCache = GetCookingCache();
 	if (UNLIKELY(!CookingCache))
@@ -100,7 +102,7 @@ void UWwiseResourceCooker::CookExternalSource(uint32 InCookie, WriteAdditionalFi
 	}
 }
 
-void UWwiseResourceCooker::CookInitBank(const FWwiseAssetInfo& InInfo, WriteAdditionalFileFunction WriteAdditionalFile)
+void FWwiseResourceCooker::CookInitBank(const FWwiseObjectInfo& InInfo, WriteAdditionalFileFunction WriteAdditionalFile)
 {
 	auto* CookingCache = GetCookingCache();
 	if (UNLIKELY(!CookingCache))
@@ -126,7 +128,7 @@ void UWwiseResourceCooker::CookInitBank(const FWwiseAssetInfo& InInfo, WriteAddi
 	}
 }
 
-void UWwiseResourceCooker::CookMedia(const FWwiseAssetInfo& InInfo, WriteAdditionalFileFunction WriteAdditionalFile)
+void FWwiseResourceCooker::CookMedia(const FWwiseObjectInfo& InInfo, WriteAdditionalFileFunction WriteAdditionalFile)
 {
 	auto* CookingCache = GetCookingCache();
 	if (UNLIKELY(!CookingCache))
@@ -136,7 +138,7 @@ void UWwiseResourceCooker::CookMedia(const FWwiseAssetInfo& InInfo, WriteAdditio
 	}
 
 	FWwiseDatabaseMediaIdKey MediaKey;
-	MediaKey.MediaId = InInfo.AssetShortId;
+	MediaKey.MediaId = InInfo.WwiseShortId;
 	MediaKey.SoundBankId = InInfo.HardCodedSoundBankShortId;
 
 	if (const auto* CachedCookedData = CookingCache->MediaCache.Find(MediaKey))
@@ -156,33 +158,33 @@ void UWwiseResourceCooker::CookMedia(const FWwiseAssetInfo& InInfo, WriteAdditio
 	}
 }
 
-void UWwiseResourceCooker::CookShareset(const FWwiseAssetInfo& InInfo, WriteAdditionalFileFunction WriteAdditionalFile)
+void FWwiseResourceCooker::CookShareSet(const FWwiseObjectInfo& InInfo, WriteAdditionalFileFunction WriteAdditionalFile)
 {
 	auto* CookingCache = GetCookingCache();
 	if (UNLIKELY(!CookingCache))
 	{
-		UE_LOG(LogWwiseResourceCooker, Error, TEXT("CookShareset: No CookingCache."));
+		UE_LOG(LogWwiseResourceCooker, Error, TEXT("CookShareSet: No CookingCache."));
 		return;
 	}
 
-	if (const auto* CachedCookedData = CookingCache->SharesetCache.Find(InInfo))
+	if (const auto* CachedCookedData = CookingCache->ShareSetCache.Find(InInfo))
 	{
-		CookLocalizedSharesetToSandbox(*CachedCookedData, WriteAdditionalFile);
+		CookLocalizedShareSetToSandbox(*CachedCookedData, WriteAdditionalFile);
 	}
 	else
 	{
-		FWwiseLocalizedSharesetCookedData CookedData;
-		if (UNLIKELY(!GetSharesetCookedData(CookedData, InInfo)))
+		FWwiseLocalizedShareSetCookedData CookedData;
+		if (UNLIKELY(!GetShareSetCookedData(CookedData, InInfo)))
 		{
 			return;
 		}
 
-		CookingCache->SharesetCache.Add(InInfo, CookedData);
-		CookLocalizedSharesetToSandbox(CookedData, WriteAdditionalFile);
+		CookingCache->ShareSetCache.Add(InInfo, CookedData);
+		CookLocalizedShareSetToSandbox(CookedData, WriteAdditionalFile);
 	}
 }
 
-void UWwiseResourceCooker::CookSoundBank(const FWwiseAssetInfo& InInfo, WriteAdditionalFileFunction WriteAdditionalFile)
+void FWwiseResourceCooker::CookSoundBank(const FWwiseObjectInfo& InInfo, WriteAdditionalFileFunction WriteAdditionalFile)
 {
 	auto* CookingCache = GetCookingCache();
 	if (UNLIKELY(!CookingCache))
@@ -208,7 +210,7 @@ void UWwiseResourceCooker::CookSoundBank(const FWwiseAssetInfo& InInfo, WriteAdd
 	}
 }
 
-bool UWwiseResourceCooker::PrepareCookedData(FWwiseAcousticTextureCookedData& OutCookedData, const FWwiseAssetInfo& InInfo)
+bool FWwiseResourceCooker::PrepareCookedData(FWwiseAcousticTextureCookedData& OutCookedData, const FWwiseObjectInfo& InInfo)
 {
 	auto* CookingCache = GetCookingCache();
 	if (!CookingCache)
@@ -229,7 +231,7 @@ bool UWwiseResourceCooker::PrepareCookedData(FWwiseAcousticTextureCookedData& Ou
 	return false;
 }
 
-bool UWwiseResourceCooker::PrepareCookedData(FWwiseLocalizedAuxBusCookedData& OutCookedData, const FWwiseAssetInfo& InInfo)
+bool FWwiseResourceCooker::PrepareCookedData(FWwiseLocalizedAuxBusCookedData& OutCookedData, const FWwiseObjectInfo& InInfo)
 {
 	auto* CookingCache = GetCookingCache();
 	if (!CookingCache)
@@ -250,7 +252,7 @@ bool UWwiseResourceCooker::PrepareCookedData(FWwiseLocalizedAuxBusCookedData& Ou
 	return false;
 }
 
-bool UWwiseResourceCooker::PrepareCookedData(FWwiseLocalizedEventCookedData& OutCookedData, const FWwiseEventInfo& InInfo)
+bool FWwiseResourceCooker::PrepareCookedData(FWwiseLocalizedEventCookedData& OutCookedData, const FWwiseEventInfo& InInfo)
 {
 	auto* CookingCache = GetCookingCache();
 	if (!CookingCache)
@@ -271,7 +273,7 @@ bool UWwiseResourceCooker::PrepareCookedData(FWwiseLocalizedEventCookedData& Out
 	return false;
 }
 
-bool UWwiseResourceCooker::PrepareCookedData(FWwiseExternalSourceCookedData& OutCookedData, uint32 InCookie)
+bool FWwiseResourceCooker::PrepareCookedData(FWwiseExternalSourceCookedData& OutCookedData, uint32 InCookie)
 {
 	auto* CookingCache = GetCookingCache();
 	if (!CookingCache)
@@ -292,7 +294,7 @@ bool UWwiseResourceCooker::PrepareCookedData(FWwiseExternalSourceCookedData& Out
 	return false;
 }
 
-bool UWwiseResourceCooker::PrepareCookedData(FWwiseGameParameterCookedData& OutCookedData, const FWwiseAssetInfo& InInfo)
+bool FWwiseResourceCooker::PrepareCookedData(FWwiseGameParameterCookedData& OutCookedData, const FWwiseObjectInfo& InInfo)
 {
 	auto* CookingCache = GetCookingCache();
 	if (!CookingCache)
@@ -313,7 +315,7 @@ bool UWwiseResourceCooker::PrepareCookedData(FWwiseGameParameterCookedData& OutC
 	return false;
 }
 
-bool UWwiseResourceCooker::PrepareCookedData(FWwiseGroupValueCookedData& OutCookedData, const FWwiseGroupValueInfo& InInfo, EWwiseGroupType InGroupType)
+bool FWwiseResourceCooker::PrepareCookedData(FWwiseGroupValueCookedData& OutCookedData, const FWwiseGroupValueInfo& InInfo, EWwiseGroupType InGroupType)
 {
 	auto* CookingCache = GetCookingCache();
 	if (InGroupType == EWwiseGroupType::State)
@@ -355,7 +357,7 @@ bool UWwiseResourceCooker::PrepareCookedData(FWwiseGroupValueCookedData& OutCook
 	return false;
 }
 
-bool UWwiseResourceCooker::PrepareCookedData(FWwiseInitBankCookedData& OutCookedData, const FWwiseAssetInfo& InInfo)
+bool FWwiseResourceCooker::PrepareCookedData(FWwiseInitBankCookedData& OutCookedData, const FWwiseObjectInfo& InInfo)
 {
 	auto* CookingCache = GetCookingCache();
 	if (!CookingCache)
@@ -376,7 +378,7 @@ bool UWwiseResourceCooker::PrepareCookedData(FWwiseInitBankCookedData& OutCooked
 	return false;
 }
 
-bool UWwiseResourceCooker::PrepareCookedData(FWwiseMediaCookedData& OutCookedData, const FWwiseAssetInfo& InInfo)
+bool FWwiseResourceCooker::PrepareCookedData(FWwiseMediaCookedData& OutCookedData, const FWwiseObjectInfo& InInfo)
 {
 	auto* CookingCache = GetCookingCache();
 	if (!CookingCache)
@@ -385,7 +387,7 @@ bool UWwiseResourceCooker::PrepareCookedData(FWwiseMediaCookedData& OutCookedDat
 	}
 
 	FWwiseDatabaseMediaIdKey MediaIdKey;
-	MediaIdKey.MediaId = InInfo.AssetShortId;
+	MediaIdKey.MediaId = InInfo.WwiseShortId;
 	MediaIdKey.SoundBankId = InInfo.HardCodedSoundBankShortId;
 
 	if (const auto* CachedCookedData = CookingCache->MediaCache.Find(MediaIdKey))
@@ -401,28 +403,28 @@ bool UWwiseResourceCooker::PrepareCookedData(FWwiseMediaCookedData& OutCookedDat
 	return false;
 }
 
-bool UWwiseResourceCooker::PrepareCookedData(FWwiseLocalizedSharesetCookedData& OutCookedData, const FWwiseAssetInfo& InInfo)
+bool FWwiseResourceCooker::PrepareCookedData(FWwiseLocalizedShareSetCookedData& OutCookedData, const FWwiseObjectInfo& InInfo)
 {
 	auto* CookingCache = GetCookingCache();
 	if (!CookingCache)
 	{
-		return GetSharesetCookedData(OutCookedData, InInfo);
+		return GetShareSetCookedData(OutCookedData, InInfo);
 	}
 
-	if (const auto* CachedCookedData = CookingCache->SharesetCache.Find(InInfo))
+	if (const auto* CachedCookedData = CookingCache->ShareSetCache.Find(InInfo))
 	{
 		OutCookedData = *CachedCookedData;
 		return true;
 	}
-	else if (LIKELY(GetSharesetCookedData(OutCookedData, InInfo)))
+	else if (LIKELY(GetShareSetCookedData(OutCookedData, InInfo)))
 	{
-		CookingCache->SharesetCache.Add(InInfo, OutCookedData);
+		CookingCache->ShareSetCache.Add(InInfo, OutCookedData);
 		return true;
 	}
 	return false;
 }
 
-bool UWwiseResourceCooker::PrepareCookedData(FWwiseLocalizedSoundBankCookedData& OutCookedData, const FWwiseAssetInfo& InInfo)
+bool FWwiseResourceCooker::PrepareCookedData(FWwiseLocalizedSoundBankCookedData& OutCookedData, const FWwiseObjectInfo& InInfo)
 {
 	auto* CookingCache = GetCookingCache();
 	if (!CookingCache)
@@ -443,7 +445,7 @@ bool UWwiseResourceCooker::PrepareCookedData(FWwiseLocalizedSoundBankCookedData&
 	return false;
 }
 
-bool UWwiseResourceCooker::PrepareCookedData(FWwiseTriggerCookedData& OutCookedData, const FWwiseAssetInfo& InInfo)
+bool FWwiseResourceCooker::PrepareCookedData(FWwiseTriggerCookedData& OutCookedData, const FWwiseObjectInfo& InInfo)
 {
 	auto* CookingCache = GetCookingCache();
 	if (!CookingCache)
@@ -464,7 +466,7 @@ bool UWwiseResourceCooker::PrepareCookedData(FWwiseTriggerCookedData& OutCookedD
 	return false;
 }
 
-void UWwiseResourceCooker::SetSandboxRootPath(const TCHAR* InPackageFilename)
+void FWwiseResourceCooker::SetSandboxRootPath(const TCHAR* InPackageFilename)
 {
 	if (!SandboxRootPath.IsEmpty())
 	{
@@ -482,7 +484,7 @@ void UWwiseResourceCooker::SetSandboxRootPath(const TCHAR* InPackageFilename)
 	SandboxRootPath = SandboxPath;
 }
 
-UWwiseResourceLoader* UWwiseResourceCooker::GetResourceLoader()
+FWwiseResourceLoader* FWwiseResourceCooker::GetResourceLoader()
 {
 	if (auto* ProjectDatabase = GetProjectDatabase())
 	{
@@ -490,11 +492,11 @@ UWwiseResourceLoader* UWwiseResourceCooker::GetResourceLoader()
 	}
 	else
 	{
-		return UWwiseResourceLoader::Get();
+		return FWwiseResourceLoader::Get();
 	}
 }
 
-const UWwiseResourceLoader* UWwiseResourceCooker::GetResourceLoader() const
+const FWwiseResourceLoader* FWwiseResourceCooker::GetResourceLoader() const
 {
 	if (const auto* ProjectDatabase = GetProjectDatabase())
 	{
@@ -502,11 +504,11 @@ const UWwiseResourceLoader* UWwiseResourceCooker::GetResourceLoader() const
 	}
 	else
 	{
-		return UWwiseResourceLoader::Get();
+		return FWwiseResourceLoader::Get();
 	}
 }
 
-FWwiseSharedLanguageId UWwiseResourceCooker::GetCurrentLanguage() const
+FWwiseSharedLanguageId FWwiseResourceCooker::GetCurrentLanguage() const
 {
 	if (const auto* ProjectDatabase = GetProjectDatabase())
 	{
@@ -515,7 +517,7 @@ FWwiseSharedLanguageId UWwiseResourceCooker::GetCurrentLanguage() const
 	return {};
 }
 
-FWwiseSharedPlatformId UWwiseResourceCooker::GetCurrentPlatform() const
+FWwiseSharedPlatformId FWwiseResourceCooker::GetCurrentPlatform() const
 {
 	if (const auto* ProjectDatabase = GetProjectDatabase())
 	{
@@ -524,38 +526,38 @@ FWwiseSharedPlatformId UWwiseResourceCooker::GetCurrentPlatform() const
 	return {};
 }
 
-void UWwiseResourceCooker::CookLocalizedAuxBusToSandbox(const FWwiseLocalizedAuxBusCookedData& InCookedData, WriteAdditionalFileFunction WriteAdditionalFile)
+void FWwiseResourceCooker::CookLocalizedAuxBusToSandbox(const FWwiseLocalizedAuxBusCookedData& InCookedData, WriteAdditionalFileFunction WriteAdditionalFile)
 {
 	for (const auto& AuxBus : InCookedData.AuxBusLanguageMap)
 	{
-		UE_LOG(LogWwiseResourceCooker, Verbose, TEXT("Cooking AuxBus %s in %s %" PRIu32), *InCookedData.DebugName, *AuxBus.Key.GetLanguageName(), (uint32)AuxBus.Key.GetLanguageId());
+		UE_LOG(LogWwiseResourceCooker, Verbose, TEXT("Cooking AuxBus %s in %s %" PRIu32), *InCookedData.DebugName.ToString(), *AuxBus.Key.GetLanguageName().ToString(), (uint32)AuxBus.Key.GetLanguageId());
 		CookAuxBusToSandbox(AuxBus.Value, WriteAdditionalFile);
 	}
 }
 
-void UWwiseResourceCooker::CookLocalizedEventToSandbox(const FWwiseLocalizedEventCookedData& InCookedData, WriteAdditionalFileFunction WriteAdditionalFile)
+void FWwiseResourceCooker::CookLocalizedEventToSandbox(const FWwiseLocalizedEventCookedData& InCookedData, WriteAdditionalFileFunction WriteAdditionalFile)
 {
 	for (const auto& Event : InCookedData.EventLanguageMap)
 	{
-		UE_LOG(LogWwiseResourceCooker, Verbose, TEXT("Cooking Event %s in %s %" PRIu32), *InCookedData.DebugName, *Event.Key.GetLanguageName(), (uint32)Event.Key.GetLanguageId());
+		UE_LOG(LogWwiseResourceCooker, Verbose, TEXT("Cooking Event %s in %s %" PRIu32), *InCookedData.DebugName.ToString(), *Event.Key.GetLanguageName().ToString(), (uint32)Event.Key.GetLanguageId());
 		CookEventToSandbox(Event.Value, WriteAdditionalFile);
 	}
 }
 
-void UWwiseResourceCooker::CookLocalizedSharesetToSandbox(const FWwiseLocalizedSharesetCookedData& InCookedData, WriteAdditionalFileFunction WriteAdditionalFile)
+void FWwiseResourceCooker::CookLocalizedShareSetToSandbox(const FWwiseLocalizedShareSetCookedData& InCookedData, WriteAdditionalFileFunction WriteAdditionalFile)
 {
-	for (const auto& Shareset : InCookedData.SharesetLanguageMap)
+	for (const auto& ShareSet : InCookedData.ShareSetLanguageMap)
 	{
-		UE_LOG(LogWwiseResourceCooker, Verbose, TEXT("Cooking Shareset %s in %s %" PRIu32), *InCookedData.DebugName, *Shareset.Key.GetLanguageName(), (uint32)Shareset.Key.GetLanguageId());
-		CookSharesetToSandbox(Shareset.Value, WriteAdditionalFile);
+		UE_LOG(LogWwiseResourceCooker, Verbose, TEXT("Cooking ShareSet %s in %s %" PRIu32), *InCookedData.DebugName.ToString(), *ShareSet.Key.GetLanguageName().ToString(), (uint32)ShareSet.Key.GetLanguageId());
+		CookShareSetToSandbox(ShareSet.Value, WriteAdditionalFile);
 	}
 }
 
-void UWwiseResourceCooker::CookLocalizedSoundBankToSandbox(const FWwiseLocalizedSoundBankCookedData& InCookedData, WriteAdditionalFileFunction WriteAdditionalFile)
+void FWwiseResourceCooker::CookLocalizedSoundBankToSandbox(const FWwiseLocalizedSoundBankCookedData& InCookedData, WriteAdditionalFileFunction WriteAdditionalFile)
 {
 	for (const auto& SoundBank : InCookedData.SoundBankLanguageMap)
 	{
-		UE_LOG(LogWwiseResourceCooker, Verbose, TEXT("Cooking SoundBank %s in %s %" PRIu32), *InCookedData.DebugName, *SoundBank.Key.GetLanguageName(), (uint32)SoundBank.Key.GetLanguageId());
+		UE_LOG(LogWwiseResourceCooker, Verbose, TEXT("Cooking SoundBank %s in %s %" PRIu32), *InCookedData.DebugName.ToString(), *SoundBank.Key.GetLanguageName().ToString(), (uint32)SoundBank.Key.GetLanguageId());
 		CookSoundBankToSandbox(SoundBank.Value, WriteAdditionalFile);
 	}
 }

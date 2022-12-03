@@ -1,71 +1,65 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
 Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
 #pragma once
 
 #include "Wwise/WwiseResourceCooker.h"
-#include "WwiseResourceCookerImpl.generated.h"
 
-UCLASS()
-class WWISERESOURCECOOKER_API UWwiseResourceCookerImpl : public UWwiseResourceCooker
+class WWISERESOURCECOOKER_API FWwiseResourceCookerImpl : public FWwiseResourceCooker
 {
-	GENERATED_BODY()
-
 public:
-	UWwiseResourceCookerImpl();
-	~UWwiseResourceCookerImpl() override;
+	FWwiseResourceCookerImpl();
+	~FWwiseResourceCookerImpl() override;
 
-	UPROPERTY()
 	EWwiseExportDebugNameRule ExportDebugNameRule;
 
-	UWwiseProjectDatabase* GetProjectDatabase() override;
-	const UWwiseProjectDatabase* GetProjectDatabase() const override;
+	FWwiseProjectDatabase* GetProjectDatabase() override;
+	const FWwiseProjectDatabase* GetProjectDatabase() const override;
 
-	void PrepareResourceCookerForPlatform(UWwiseProjectDatabase* InProjectDatabaseOverride, EWwiseExportDebugNameRule InExportDebugNameRule) override;
+	void PrepareResourceCookerForPlatform(FWwiseProjectDatabase*&& InProjectDatabaseOverride, EWwiseExportDebugNameRule InExportDebugNameRule) override;
 
 protected:
-	UPROPERTY()
-	UWwiseCookingCache* CookingCache;
+	TUniquePtr<FWwiseCookingCache> CookingCache;
+	TUniquePtr<FWwiseProjectDatabase> ProjectDatabaseOverride;
 
-	UPROPERTY()
-	UWwiseProjectDatabase* ProjectDatabaseOverride;
-
-	UWwiseCookingCache* GetCookingCache() override { return CookingCache; }
+	FWwiseCookingCache* GetCookingCache() override { return CookingCache.Get(); }
 
 	void CookAuxBusToSandbox(const FWwiseAuxBusCookedData& InCookedData, WriteAdditionalFileFunction WriteAdditionalFile) override;
 	void CookEventToSandbox(const FWwiseEventCookedData& InCookedData, WriteAdditionalFileFunction WriteAdditionalFile) override;
 	void CookExternalSourceToSandbox(const FWwiseExternalSourceCookedData& InCookedData, WriteAdditionalFileFunction WriteAdditionalFile) override;
 	void CookInitBankToSandbox(const FWwiseInitBankCookedData& InCookedData, WriteAdditionalFileFunction WriteAdditionalFile) override;
 	void CookMediaToSandbox(const FWwiseMediaCookedData& InCookedData, WriteAdditionalFileFunction WriteAdditionalFile) override;
-	void CookSharesetToSandbox(const FWwiseSharesetCookedData& InCookedData, WriteAdditionalFileFunction WriteAdditionalFile) override;
+	void CookShareSetToSandbox(const FWwiseShareSetCookedData& InCookedData, WriteAdditionalFileFunction WriteAdditionalFile) override;
 	void CookSoundBankToSandbox(const FWwiseSoundBankCookedData& InCookedData, WriteAdditionalFileFunction WriteAdditionalFile) override;
 
-	void CookFileToSandbox(const FString& InInputPathName, const FString& InOutputPathName, WriteAdditionalFileFunction WriteAdditionalFile, bool bInStageRelativeToContent = false) override;
+	void CookFileToSandbox(const FString& InInputPathName, const FName& InOutputPathName, WriteAdditionalFileFunction WriteAdditionalFile, bool bInStageRelativeToContent = false) override;
 
-	bool GetAcousticTextureCookedData(FWwiseAcousticTextureCookedData& OutCookedData, const FWwiseAssetInfo& InInfo) const override;
-	bool GetAuxBusCookedData(FWwiseLocalizedAuxBusCookedData& OutCookedData, const FWwiseAssetInfo& InInfo) const override;
+	bool GetAcousticTextureCookedData(FWwiseAcousticTextureCookedData& OutCookedData, const FWwiseObjectInfo& InInfo) const override;
+	bool GetAuxBusCookedData(FWwiseLocalizedAuxBusCookedData& OutCookedData, const FWwiseObjectInfo& InInfo) const override;
 	bool GetEventCookedData(FWwiseLocalizedEventCookedData& OutCookedData, const FWwiseEventInfo& InInfo) const override;
 	bool GetExternalSourceCookedData(FWwiseExternalSourceCookedData& OutCookedData, uint32 InCookie) const override;
-	bool GetGameParameterCookedData(FWwiseGameParameterCookedData& OutCookedData, const FWwiseAssetInfo& InInfo) const override;
-	bool GetInitBankCookedData(FWwiseInitBankCookedData& OutCookedData, const FWwiseAssetInfo& InInfo = FWwiseAssetInfo::DefaultInitBank) const override;
-	bool GetMediaCookedData(FWwiseMediaCookedData& OutCookedData, const FWwiseAssetInfo& InInfo) const override;
-	bool GetSharesetCookedData(FWwiseLocalizedSharesetCookedData& OutCookedData, const FWwiseAssetInfo& InInfo) const override;
-	bool GetSoundBankCookedData(FWwiseLocalizedSoundBankCookedData& OutCookedData, const FWwiseAssetInfo& InInfo) const override;
+	bool GetGameParameterCookedData(FWwiseGameParameterCookedData& OutCookedData, const FWwiseObjectInfo& InInfo) const override;
+	bool GetInitBankCookedData(FWwiseInitBankCookedData& OutCookedData, const FWwiseObjectInfo& InInfo = FWwiseObjectInfo::DefaultInitBank) const override;
+	bool GetMediaCookedData(FWwiseMediaCookedData& OutCookedData, const FWwiseObjectInfo& InInfo) const override;
+	bool GetShareSetCookedData(FWwiseLocalizedShareSetCookedData& OutCookedData, const FWwiseObjectInfo& InInfo) const override;
+	bool GetSoundBankCookedData(FWwiseLocalizedSoundBankCookedData& OutCookedData, const FWwiseObjectInfo& InInfo) const override;
 	bool GetStateCookedData(FWwiseGroupValueCookedData& OutCookedData, const FWwiseGroupValueInfo& InInfo) const override;
 	bool GetSwitchCookedData(FWwiseGroupValueCookedData& OutCookedData, const FWwiseGroupValueInfo& InInfo) const override;
-	bool GetTriggerCookedData(FWwiseTriggerCookedData& OutCookedData, const FWwiseAssetInfo& InInfo) const override;
+	bool GetTriggerCookedData(FWwiseTriggerCookedData& OutCookedData, const FWwiseObjectInfo& InInfo) const override;
 
 	virtual bool FillSoundBankBaseInfo(FWwiseSoundBankCookedData& OutSoundBankCookedData,
 		const FWwiseMetadataPlatformInfo& InPlatformInfo,

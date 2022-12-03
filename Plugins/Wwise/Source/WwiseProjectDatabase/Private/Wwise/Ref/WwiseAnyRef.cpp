@@ -1,15 +1,17 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
 Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
@@ -31,7 +33,7 @@ Copyright (c) 2022 Audiokinetic Inc.
 #include "Wwise/Ref/WwiseRefMedia.h"
 #include "Wwise/Ref/WwiseRefPlatform.h"
 #include "Wwise/Ref/WwiseRefPluginLib.h"
-#include "Wwise/Ref/WwiseRefPluginShareset.h"
+#include "Wwise/Ref/WwiseRefPluginShareSet.h"
 #include "Wwise/Ref/WwiseRefSoundBank.h"
 #include "Wwise/Ref/WwiseRefState.h"
 #include "Wwise/Ref/WwiseRefSwitch.h"
@@ -92,13 +94,13 @@ const FWwiseRefCustomPlugin* FWwiseAnyRef::GetCustomPluginRef() const
 	return static_cast<const FWwiseRefCustomPlugin*>(Ref.Get());
 }
 
-const FWwiseRefPluginShareset* FWwiseAnyRef::GetPluginSharesetRef() const
+const FWwiseRefPluginShareSet* FWwiseAnyRef::GetPluginShareSetRef() const
 {
-	if (UNLIKELY(GetType() != EWwiseRefType::PluginShareset))
+	if (UNLIKELY(GetType() != EWwiseRefType::PluginShareSet))
 	{
 		return nullptr;
 	}
-	return static_cast<const FWwiseRefPluginShareset*>(Ref.Get());
+	return static_cast<const FWwiseRefPluginShareSet*>(Ref.Get());
 }
 
 const FWwiseRefAudioDevice* FWwiseAnyRef::GetAudioDeviceRef() const
@@ -306,14 +308,14 @@ const FWwiseMetadataPlugin* FWwiseAnyRef::GetCustomPlugin() const
 	return CustomPluginRef->GetPlugin();
 }
 
-const FWwiseMetadataPlugin* FWwiseAnyRef::GetPluginShareset() const
+const FWwiseMetadataPlugin* FWwiseAnyRef::GetPluginShareSet() const
 {
-	const auto* PluginSharesetRef = GetPluginSharesetRef();
-	if (UNLIKELY(!PluginSharesetRef))
+	const auto* PluginShareSetRef = GetPluginShareSetRef();
+	if (UNLIKELY(!PluginShareSetRef))
 	{
 		return nullptr;
 	}
-	return PluginSharesetRef->GetPlugin();
+	return PluginShareSetRef->GetPlugin();
 }
 
 const FWwiseMetadataPlugin* FWwiseAnyRef::GetAudioDevice() const
@@ -532,9 +534,9 @@ bool FWwiseAnyRef::GetRef(FWwiseRefCustomPlugin& OutRef) const
 	return true;
 }
 
-bool FWwiseAnyRef::GetRef(FWwiseRefPluginShareset& OutRef) const
+bool FWwiseAnyRef::GetRef(FWwiseRefPluginShareSet& OutRef) const
 {
-	const auto* Result = GetPluginSharesetRef();
+	const auto* Result = GetPluginShareSetRef();
 	if (UNLIKELY(!Result))
 	{
 		return false;
@@ -724,7 +726,7 @@ FGuid FWwiseAnyRef::GetGuid(const EWwiseRefType* TypeOverride) const
 	case EWwiseRefType::SoundBank: return GetSoundBank()->GUID;
 	case EWwiseRefType::Media: return {};
 	case EWwiseRefType::CustomPlugin: return GetCustomPlugin()->GUID;
-	case EWwiseRefType::PluginShareset: return GetPluginShareset()->GUID;
+	case EWwiseRefType::PluginShareSet: return GetPluginShareSet()->GUID;
 	case EWwiseRefType::AudioDevice: return GetAudioDevice()->GUID;
 	case EWwiseRefType::Event: return GetEvent()->GUID;
 	case EWwiseRefType::SwitchContainer: return {};
@@ -762,7 +764,7 @@ uint32 FWwiseAnyRef::GetGroupId(const EWwiseRefType* TypeOverride) const
 	case EWwiseRefType::SoundBank: return 0;
 	case EWwiseRefType::Media: return 0;
 	case EWwiseRefType::CustomPlugin: return 0;
-	case EWwiseRefType::PluginShareset: return 0;
+	case EWwiseRefType::PluginShareSet: return 0;
 	case EWwiseRefType::AudioDevice: return 0;
 	case EWwiseRefType::Event: return 0;
 	case EWwiseRefType::SwitchContainer: return 0;
@@ -800,7 +802,7 @@ uint32 FWwiseAnyRef::GetId(const EWwiseRefType* TypeOverride) const
 	case EWwiseRefType::SoundBank: return GetSoundBank()->Id;
 	case EWwiseRefType::Media: return GetMedia()->Id;
 	case EWwiseRefType::CustomPlugin: return GetCustomPlugin()->Id;
-	case EWwiseRefType::PluginShareset: return GetPluginShareset()->Id;
+	case EWwiseRefType::PluginShareSet: return GetPluginShareSet()->Id;
 	case EWwiseRefType::AudioDevice: return GetAudioDevice()->Id;
 	case EWwiseRefType::Event: return GetEvent()->Id;
 	case EWwiseRefType::SwitchContainer: return 0;
@@ -822,7 +824,7 @@ uint32 FWwiseAnyRef::GetId(const EWwiseRefType* TypeOverride) const
 	}
 }
 
-FString FWwiseAnyRef::GetName(const EWwiseRefType* TypeOverride) const
+FName FWwiseAnyRef::GetName(const EWwiseRefType* TypeOverride) const
 {
 	const auto Type = TypeOverride ? *TypeOverride : GetType();
 	switch (Type)
@@ -838,7 +840,7 @@ FString FWwiseAnyRef::GetName(const EWwiseRefType* TypeOverride) const
 	case EWwiseRefType::SoundBank: return GetSoundBank()->ShortName;
 	case EWwiseRefType::Media: return GetMedia()->ShortName;
 	case EWwiseRefType::CustomPlugin: return GetCustomPlugin()->Name;
-	case EWwiseRefType::PluginShareset: return GetPluginShareset()->Name;
+	case EWwiseRefType::PluginShareSet: return GetPluginShareSet()->Name;
 	case EWwiseRefType::AudioDevice: return GetAudioDevice()->Name;
 	case EWwiseRefType::Event: return GetEvent()->Name;
 	case EWwiseRefType::SwitchContainer: return {};
@@ -860,7 +862,7 @@ FString FWwiseAnyRef::GetName(const EWwiseRefType* TypeOverride) const
 	}
 }
 
-FString FWwiseAnyRef::GetObjectPath(const EWwiseRefType* TypeOverride) const
+FName FWwiseAnyRef::GetObjectPath(const EWwiseRefType* TypeOverride) const
 {
 	const auto Type = TypeOverride ? *TypeOverride : GetType();
 	switch (Type)
@@ -876,7 +878,7 @@ FString FWwiseAnyRef::GetObjectPath(const EWwiseRefType* TypeOverride) const
 	case EWwiseRefType::SoundBank: return GetSoundBank()->ObjectPath;
 	case EWwiseRefType::Media: return {};
 	case EWwiseRefType::CustomPlugin: return GetCustomPlugin()->ObjectPath;
-	case EWwiseRefType::PluginShareset: return GetPluginShareset()->ObjectPath;
+	case EWwiseRefType::PluginShareSet: return GetPluginShareSet()->ObjectPath;
 	case EWwiseRefType::AudioDevice: return GetAudioDevice()->ObjectPath;
 	case EWwiseRefType::Event: return GetEvent()->ObjectPath;
 	case EWwiseRefType::SwitchContainer: return {};

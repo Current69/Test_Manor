@@ -1,15 +1,17 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
 Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
@@ -23,8 +25,7 @@ Copyright (c) 2022 Audiokinetic Inc.
 
 FWwiseFileState::~FWwiseFileState()
 {
-	UE_CLOG(!IsEngineExitRequested() && UNLIKELY(State != EState::Closed), LogWwiseFileHandler, Warning, TEXT("State: Deleting unclosed file state. Leaking."));
-	UE_CLOG(IsEngineExitRequested() && State != EState::Closed, LogWwiseFileHandler, VeryVerbose, TEXT("State: Deleting unclosed file state at exit. Leaking."));
+	UE_CLOG(!FileStateExecutionQueue.IsClosed(), LogWwiseFileHandler, Error, TEXT("Closing the File State without closing the Execution Queue."));
 }
 
 void FWwiseFileState::IncrementCountAsync(EWwiseFileStateOperationOrigin InOperationOrigin,
@@ -72,8 +73,18 @@ FWwiseFileState::FWwiseFileState():
 {
 }
 
+void FWwiseFileState::Term()
+{
+	UE_LOG(LogWwiseFileHandler, VeryVerbose, TEXT("Term %s file state %" PRIu32"."), GetManagingTypeName(), GetShortId());
+	UE_CLOG(!IsEngineExitRequested() && UNLIKELY(State != EState::Closed), LogWwiseFileHandler, Warning, TEXT("%s State: Term unclosed file state %" PRIu32 ". Leaking."), GetManagingTypeName(), GetShortId());
+	UE_CLOG(IsEngineExitRequested() && State != EState::Closed, LogWwiseFileHandler, VeryVerbose, TEXT("%s State: Term unclosed file state %" PRIu32 " at exit. Leaking."), GetManagingTypeName(), GetShortId());
+	UE_CLOG(LoadCount != 0, LogWwiseFileHandler, Error, TEXT("Term %s file state %" PRIu32 " when there are still %d load count"), GetManagingTypeName(), GetShortId(), LoadCount);
+
+	FileStateExecutionQueue.Close();
+}
+
 void FWwiseFileState::IncrementCount(EWwiseFileStateOperationOrigin InOperationOrigin,
-	FIncrementCountCallback&& InCallback)
+                                     FIncrementCountCallback&& InCallback)
 {
 	IncrementLoadCount(InOperationOrigin);
 
@@ -206,7 +217,9 @@ void FWwiseFileState::IncrementCountDone(EWwiseFileStateOperationOrigin InOperat
 	}
 	else
 	{
-		bResult = (State == EState::Opened || State == EState::Loaded);
+		bResult = (State == EState::Loaded)
+			|| (State == EState::Opened && !CanLoadInSoundEngine())
+			|| (State == EState::Closed && !CanOpenFile());
 		UE_CLOG(UNLIKELY(!bResult), LogWwiseFileHandler, Warning, TEXT("IncrementCountDone %s %" PRIu32 ": Could not open file for asset loading."),
 			GetManagingTypeName(), GetShortId());
 	}
@@ -422,20 +435,18 @@ void FWwiseFileState::DecrementCountClose(EWwiseFileStateOperationOrigin InOpera
 void FWwiseFileState::DecrementCountDone(EWwiseFileStateOperationOrigin InOperationOrigin,
 	FDeleteFileStateFunction&& InDeleteState, FDecrementCountCallback&& InCallback)
 {
-	// Keep copies as "this" might be deleted by InDeleteState()
-	const auto ManagingTypeNameCopy = GetManagingTypeName();
-	const auto ShortIdCopy = GetShortId();
-
 	if (CanDelete())
 	{
-		UE_LOG(LogWwiseFileHandler, VeryVerbose, TEXT("DecrementCountDone %s %" PRIu32 ": Deleting state."),
+		UE_LOG(LogWwiseFileHandler, VeryVerbose, TEXT("DecrementCountDone %s %" PRIu32 ": Done decrementing. Deleting state."),
 				GetManagingTypeName(), GetShortId());
-		InDeleteState();
+		InDeleteState(MoveTemp(InCallback));
 	}
-
-	UE_LOG(LogWwiseFileHandler, VeryVerbose, TEXT("DecrementCountDone %s %" PRIu32 ": Done decrementing."),
-		ManagingTypeNameCopy, ShortIdCopy);
-	InCallback();
+	else
+	{
+		UE_LOG(LogWwiseFileHandler, VeryVerbose, TEXT("DecrementCountDone %s %" PRIu32 ": Done decrementing."),
+				GetManagingTypeName(), GetShortId());
+		InCallback();
+	}
 }
 
 void FWwiseFileState::IncrementLoadCount(EWwiseFileStateOperationOrigin InOperationOrigin)

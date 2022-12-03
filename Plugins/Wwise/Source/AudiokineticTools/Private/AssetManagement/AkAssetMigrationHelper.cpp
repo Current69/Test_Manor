@@ -1,16 +1,18 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
-Copyright (c) 2021 Audiokinetic Inc.
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
+Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
 #include "AkAssetMigrationHelper.h"
@@ -27,7 +29,7 @@ Copyright (c) 2021 Audiokinetic Inc.
 #include "AkUnrealEditorHelper.h"
 #include "AkUnrealHelper.h"
 #include "IAudiokineticTools.h"
-#include "AssetRegistry/Public/AssetRegistryModule.h"
+#include "AssetRegistry/AssetRegistryModule.h"
 #include "AssetTools/Public/AssetToolsModule.h"
 
 #include "GenericPlatform/GenericPlatformFile.h"
@@ -38,13 +40,20 @@ Copyright (c) 2021 Audiokinetic Inc.
 #include "IDesktopPlatform.h"
 #include "DesktopPlatformModule.h"
 #include "Interfaces/IMainFrameModule.h"
+#include "Mathematics/APConversion.h"
 
 #define LOCTEXT_NAMESPACE "AkAudio"
 
 namespace AkAssetMigration
 {
-	void PromptMigration(const FMigrationOptions& MigrationOptions, FMigrationOperations& OutMigrationOperations)
+	void PromptMigration(const FMigrationContext& MigrationOptions, FMigrationOperations& OutMigrationOperations)
 	{
+		if (!FApp::CanEverRender())
+		{
+			OutMigrationOperations.bCancelled =true;
+			return;
+		}
+
 		TSharedPtr<SWindow> Dialog = SNew(SWindow)
 			.Title(LOCTEXT("BankMigrationDialog", "Wwise Integration Migration"))
 			.SupportsMaximize(false)
@@ -60,59 +69,164 @@ namespace AkAssetMigration
 			.Dialog(Dialog)
 			.ShowBankTransfer(MigrationOptions.bBanksInProject)
 			.ShowDeprecatedAssetCleanup(MigrationOptions.bDeprecatedAssetsInProject)
-			.ShowAssetMigration(MigrationOptions.bAssetsNotMigrated)
+			.ShowAssetMigration(MigrationOptions.bAssetsNeedMigration)
 			.ShowProjectMigration(MigrationOptions.bProjectSettingsNotUpToDate)
 			.NumDeprecatedAssets(MigrationOptions.NumDeprecatedAssetsInProject)
 		);
 
 		FSlateApplication::Get().AddModalWindow(Dialog.ToSharedRef(), nullptr);
-
-		OutMigrationOperations.BankTransferMethod = MigrationWidget->BankTransferWidget->BankTransferMethod;
-		OutMigrationOperations.bDoBankCleanup = MigrationWidget->BankTransferWidget->DeleteSoundBanksCheckBox->IsChecked();
-		OutMigrationOperations.bTransferAutoload = MigrationWidget->BankTransferWidget->TransferAutoLoadCheckBox->IsChecked();
-		OutMigrationOperations.bDoDeprecatedAssetCleanup = MigrationWidget->DeprecatedAssetCleanupWidget->DeleteAssetsCheckBox->IsChecked();
-		OutMigrationOperations.bDoAssetMigration = MigrationWidget->AssetMigrationWidget->MigrateAssetsCheckBox->IsChecked();
-		OutMigrationOperations.bDoProjectUpdate = MigrationWidget->ProjectMigrationWidget->AutoMigrateCheckbox->IsChecked();
+		
+		if (MigrationOptions.bBanksInProject)
+		{
+			OutMigrationOperations.BankTransferMethod = MigrationWidget->BankTransferWidget->BankTransferMethod;
+			OutMigrationOperations.bDoBankCleanup = MigrationWidget->BankTransferWidget->DeleteSoundBanksCheckBox->IsChecked();
+			OutMigrationOperations.bTransferAutoload = MigrationWidget->BankTransferWidget->TransferAutoLoadCheckBox->IsChecked();
+			OutMigrationOperations.DefinitionFilePath = MigrationWidget->BankTransferWidget->SoundBankDefinitionFilePath;
+		}
+		if (MigrationOptions.bDeprecatedAssetsInProject)
+		{
+			OutMigrationOperations.bDoDeprecatedAssetCleanup = MigrationWidget->DeprecatedAssetCleanupWidget->DeleteAssetsCheckBox->IsChecked();
+		}
+		if (MigrationOptions.bAssetsNeedMigration)
+		{
+			OutMigrationOperations.bDoAssetMigration = MigrationWidget->AssetMigrationWidget->MigrateAssetsCheckBox->IsChecked();
+		}
+		if (MigrationOptions.bProjectSettingsNotUpToDate)
+		{
+			OutMigrationOperations.bDoProjectUpdate = MigrationWidget->ProjectMigrationWidget->AutoMigrateCheckbox->IsChecked();
+			OutMigrationOperations.GeneratedSoundBankDirectory = MigrationWidget->ProjectMigrationWidget->GeneratedSoundBanksFolderPickerWidget->GetDirectory();
+		}
 		OutMigrationOperations.bCancelled = MigrationWidget->bCancel;
+	}
 
-		return;
+	bool PromptFailedBankTransfer(const FString& ErrorMessage)
+	{
+		if (!FApp::CanEverRender())
+		{
+			return false;
+		}
+		TSharedPtr<SWindow> Dialog = SNew(SWindow)
+			.Title(LOCTEXT("BankTransfer", "Bank Transfer Failure"))
+			.SupportsMaximize(false)
+			.SupportsMinimize(false)
+			.FocusWhenFirstShown(true)
+			.HasCloseButton(false)
+			.SizingRule(ESizingRule::Autosized);
+
+		TSharedPtr<SBankMigrationFailureWidget> FailedBankTransferWidget;
+
+		Dialog->SetContent(
+			SAssignNew(FailedBankTransferWidget, SBankMigrationFailureWidget)
+			.Dialog(Dialog)
+			.ErrorMessage(FText::Format( LOCTEXT("BankTransferErrorMessage", "{0}"), FText::FromString(ErrorMessage)))
+		);
+
+		FSlateApplication::Get().AddModalWindow(Dialog.ToSharedRef(), nullptr);
+		return !FailedBankTransferWidget->bCancel;
+	}
+
+		
+	FString FormatWaapiErrorMessage(const TArray<FBankTransferError>& ErrorMessages)
+	{
+		FString CombinedErrors;
+		for (auto BankErrors : ErrorMessages)
+		{
+			if (BankErrors.bHasBankEntry)
+			{
+				CombinedErrors += "SoundBank: " + BankErrors.BankEntry.BankAssetData.AssetName.ToString() + "\n";
+			}
+			CombinedErrors += "Error: " + BankErrors.ErrorMessage + "\n";
+			if (BankErrors.bHasBankEntry)
+			{
+				CombinedErrors += "Wwise Assets in SoundBank : \n";
+
+				for (auto LinkedAsset : BankErrors.BankEntry.LinkedEvents)
+				{
+					CombinedErrors += FString::Format(TEXT("GUID: {0} - Name: {1}\n"), { LinkedAsset.WwiseGuid.ToString(), LinkedAsset.AssetName });
+				}
+				for (auto LinkedAsset : BankErrors.BankEntry.LinkedAuxBusses)
+				{
+					CombinedErrors += FString::Format(TEXT("GUID: {0} - Name: {1}\n"), { LinkedAsset.WwiseGuid.ToString(), LinkedAsset.AssetName });
+				}
+			}
+		}
+		return CombinedErrors;
 	}
 
 	void FindDeprecatedAssets(TArray<FAssetData>& OutDeprecatedAssets)
 	{
 		OutDeprecatedAssets.Empty();
 		FARFilter Filter;
+#if UE_5_1_OR_LATER
+		Filter.ClassPaths.Add(UAkMediaAsset::StaticClass()->GetClassPathName());
+		Filter.ClassPaths.Add(UAkLocalizedMediaAsset::StaticClass()->GetClassPathName());
+		Filter.ClassPaths.Add(UAkExternalMediaAsset::StaticClass()->GetClassPathName());
+		Filter.ClassPaths.Add(UAkFolder::StaticClass()->GetClassPathName());
+		Filter.ClassPaths.Add(UAkAssetPlatformData::StaticClass()->GetClassPathName());
+#else
 		Filter.ClassNames.Add(UAkMediaAsset::StaticClass()->GetFName());
 		Filter.ClassNames.Add(UAkLocalizedMediaAsset::StaticClass()->GetFName());
 		Filter.ClassNames.Add(UAkExternalMediaAsset::StaticClass()->GetFName());
 		Filter.ClassNames.Add(UAkFolder::StaticClass()->GetFName());
 		Filter.ClassNames.Add(UAkAssetPlatformData::StaticClass()->GetFName());
-		
+#endif
 		auto& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
 		AssetRegistryModule.Get().GetAssets(Filter, OutDeprecatedAssets);
 	}
-	
-	void DeleteDeprecatedAssets(const TArray<FAssetData>& InAssetsToDelete)
-	{
-		ObjectTools::DeleteAssets(InAssetsToDelete, true);
 
+	bool DeleteAssets(const TArray<FAssetData>& InAssetsToDelete)
+	{
+		/*
+		 *Deleting an Asset that is referenced somewhere needs a confirmation which is impossible using a commandlet.
+		 *Calling ForceDelete on the UObjects of the Assets will ignore the confirmation and delete the assets.
+		*/
+		if(!FApp::CanEverRender())
+		{
+			TArray<UObject*> Objects;
+			for(auto Asset : InAssetsToDelete)
+			{
+				Objects.Add(Asset.GetAsset());
+			}
+			int DeletedObjects = ObjectTools::ForceDeleteObjects(Objects, false);
+			return DeletedObjects == Objects.Num();
+		}
+		else
+		{
+			int DeletedObjects = ObjectTools::DeleteAssets(InAssetsToDelete, true);
+			return DeletedObjects == InAssetsToDelete.Num();
+		}
+	}
+
+	bool DeleteDeprecatedAssets(const TArray<FAssetData>& InAssetsToDelete)
+	{
+		bool bSuccess = true;
+		bSuccess &= DeleteAssets(InAssetsToDelete);
+		
 		const FString MediaFolderpath = FPaths::Combine(AkUnrealEditorHelper::GetLegacySoundBankDirectory(), AkUnrealHelper::MediaFolderName);
 		IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
+
 		PlatformFile.DeleteDirectoryRecursively(*MediaFolderpath);
 
 		const FString LocalizedFolderPath = FPaths::Combine(AkUnrealEditorHelper::GetLegacySoundBankDirectory(), AkUnrealEditorHelper::LocalizedFolderName);
 		PlatformFile.DeleteDirectoryRecursively(*LocalizedFolderPath);
+
+		return bSuccess;
 	}
 
 	void FindWwiseAssetsInProject(TArray<FAssetData>& OutWwiseAssets)
 	{
 		FARFilter Filter;
-		Filter.ClassNames.Add(UAkAudioType::StaticClass()->GetFName());
-		Filter.bRecursiveClasses =true;
+		Filter.bRecursiveClasses = true;
+#if UE_5_1_OR_LATER
+		Filter.ClassPaths.Add(UAkAudioType::StaticClass()->GetClassPathName());
 		//We want to delete these asset types during cleanup so no need to dirty them
+		Filter.RecursiveClassPathsExclusionSet.Add(UAkAudioBank::StaticClass()->GetClassPathName());
+		Filter.RecursiveClassPathsExclusionSet.Add(UAkFolder::StaticClass()->GetClassPathName());
+#else
+		Filter.ClassNames.Add(UAkAudioType::StaticClass()->GetFName());
 		Filter.RecursiveClassesExclusionSet.Add(UAkAudioBank::StaticClass()->GetFName());
 		Filter.RecursiveClassesExclusionSet.Add(UAkFolder::StaticClass()->GetFName());
-
+#endif
 		FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
 		AssetRegistryModule.Get().GetAssets(Filter, OutWwiseAssets);
 	}
@@ -126,106 +240,169 @@ namespace AkAssetMigration
 
 		for (auto& Asset : WwiseAssets)
 		{
-			auto AssetPtr = Asset.GetAsset();
+			UAkAudioType* AssetPtr = Cast<UAkAudioType>(Asset.GetAsset());
 
-			if (AssetPtr && AssetPtr->GetLinkerCustomVersion(FAkCustomVersion::GUID) < FAkCustomVersion::SSOTAkAssetRefactor)
+			if (AssetPtr)
 			{
+				AssetPtr->MigrateWwiseObjectInfo();
 				if (AssetPtr->GetClass() == UAkAudioEvent::StaticClass())
 				{
 					UAkAudioEvent* Event = Cast<UAkAudioEvent>(AssetPtr);
 					Event->EventInfo.SwitchContainerLoading = SwitchContainerShouldLoad;
 				}
-				if (AssetPtr->MarkPackageDirty())
-				{
-					WwisePackagesToSave.Add(AssetPtr->GetPackage());
+
+				if (!AssetPtr->MarkPackageDirty())
+				{					
+					UE_LOG(LogAudiokineticTools, Warning, TEXT("Could not dirty asset %s during migration, will still try to save it."), *AssetPtr->GetFullName());
 				}
-				else
-				{
-					UE_LOG(LogAudiokineticTools, Warning, TEXT("Could not dirty asset %s during migration, old data will not be cleared."), *AssetPtr->GetFullName());
-				}
+				WwisePackagesToSave.Add(AssetPtr->GetPackage());
+			}
+			else
+			{
+				UE_LOG(LogAudiokineticTools, Error, TEXT("Could not get asset '%s' in order to migrate it."), *Asset.AssetName.ToString());
 			}
 		}
 
 		if (WwisePackagesToSave.Num() > 0)
 		{
-			return UEditorLoadingAndSavingUtils::SavePackages(WwisePackagesToSave, true);
+			if (!UEditorLoadingAndSavingUtils::SavePackages(WwisePackagesToSave, false))
+			{
+				UE_LOG(LogAudiokineticTools, Warning, TEXT("MigrateWwiseAssets: Could not save assets during asset migration. Please save them manually, or run the migration operation again."));
+				return false;
+			}
 		}
+
 		return true;
 	}
 
-	bool MigrateAudioBanks(const EBankTransferMode& TransferMode, const bool& bCleanupAssets, const bool& bWasUsingEBP, const bool& bTransferAutoLoad)
+	bool MigrateAudioBanks(const FMigrationOperations& MigrationOperations, const bool bCleanupAssets, const bool bWasUsingEBP, const bool bTransferAutoLoad, const FString DefinitionFile)
 	{
-		if (IsRunningCommandlet())
-		{
-			UE_LOG(LogAudiokineticTools, Log, TEXT("Cannot transfer soundbanks when in commandlet. This can be done at a later time manually."));
-			return false;
-		}
 		TSet<FAssetData> FailedBanks;
 		TMap<FString, FBankEntry> BanksToTransfer;
 		FillBanksToTransfer(BanksToTransfer);
-		if (TransferMode != EBankTransferMode::NoTransfer)
+		const bool bIncludeMedia = !bWasUsingEBP;
+		bool bContinueMigration = true;
+		bool bTransferSuccess = true;
+
+		FString ErrorMessage;
+		if (MigrationOperations.BankTransferMethod == EBankTransferMode::WAAPI)
 		{
-			const bool bIncludeMedia = !bWasUsingEBP;
-			TransferUserBanksToWwise(TransferMode, BanksToTransfer, FailedBanks, bIncludeMedia);
+			TArray<FBankTransferError> ErrorMessages = TransferUserBanksWaapi( BanksToTransfer, FailedBanks, bIncludeMedia);
+			ErrorMessage = FormatWaapiErrorMessage(ErrorMessages);
+			bTransferSuccess = FailedBanks.Num() == 0;
+		}
+		else if (MigrationOperations.BankTransferMethod == EBankTransferMode::DefinitionFile)
+		{
+			auto Result = WriteBankDefinitionFile( BanksToTransfer, bIncludeMedia, DefinitionFile);
+			bTransferSuccess = Result == Success;
+
+			if (!bTransferSuccess)
+			{
+				switch (Result)
+				{
+					case OpenFailure:
+						ErrorMessage = FString::Format(TEXT("Failed to open bank definition file for write '{0}'."), {DefinitionFile});
+						break;
+					case WriteFailure:
+						ErrorMessage = FString::Format(TEXT("Failed to write to bank definition file '{0}'."), {DefinitionFile});
+						break;
+					default:
+						break;
+				}
+
+			}
+		}
+
+		if (!bTransferSuccess)
+		{
+			if (!FApp::CanEverRender())
+			{
+				bContinueMigration = MigrationOperations.bIgnoreBankTransferErrors;
+			}
+			else //Migrating in Unreal Editor
+			{
+				bContinueMigration = PromptFailedBankTransfer(ErrorMessage);
+			}
+		}
+
+		if (!bContinueMigration)
+		{
+			UE_LOG(LogAudiokineticTools, Error, TEXT("MigrateAudioBanks : Errors encountered while transferring SoundBanks: \n%s"), *ErrorMessage);
+			UE_LOG(LogAudiokineticTools, Error, TEXT("MigrateAudioBanks : Migration aborted due to SoundBank transfer errors."));
+			return false;
+		}
+
+		if (!ErrorMessage.IsEmpty())
+		{
+			UE_LOG(LogAudiokineticTools, Warning, TEXT("MigrateAudioBanks : Errors encountered while transferring SoundBanks: \n%s"), *ErrorMessage);
+			UE_LOG(LogAudiokineticTools, Display, TEXT("MigrateAudioBanks : Migration will continue and ignore SoundBank transfer errors."));
 		}
 
 		if (bTransferAutoLoad)
 		{
+			UE_LOG(LogAudiokineticTools, Display, TEXT("MigrateAudioBanks: Transferring AutoLoad setting from AkAudioBank assets to Event and Aux Bus assets."));
+
 			for (auto& Bank : BanksToTransfer)
 			{
 				UAkAudioBank* BankAsset = Cast<UAkAudioBank>(Bank.Value.BankAssetData.GetAsset());
-
-				TArray<FLinkedAssetEntry>& LinkedAuxBusses = Bank.Value.LinkedAuxBusses;
-				TArray<FLinkedAssetEntry>& LinkedEvents = Bank.Value.LinkedEvents;
-
-				for (auto& LinkedAuxBus : LinkedAuxBusses)
+				if (!BankAsset)
 				{
-					if (!BankAsset->bAutoLoad)
+					UE_LOG(LogAudiokineticTools, Warning, TEXT("MigrateAudioBanks: Could not load UAkAudioBank Asset '%s'. AutoLoad property will not be transferred. "), *Bank.Value.BankAssetData.ObjectPath.ToString());
+					continue;
+				}
+				if (!BankAsset->AutoLoad_DEPRECATED)
+				{
+					TArray<FLinkedAssetEntry>& LinkedAuxBusses = Bank.Value.LinkedAuxBusses;
+					TArray<FLinkedAssetEntry>& LinkedEvents = Bank.Value.LinkedEvents;
+					for (auto& LinkedAuxBus : LinkedAuxBusses)
 					{
-						TArray<FAssetData> OutBusses;
-						AkAssetDatabase::Get().FindAssets(LinkedAuxBus.AssetGuid, OutBusses);
-
-						for (FAssetData& OutBus : OutBusses)
+						bool MigrateSuccess = false;
+						auto FoundAssetData = AkAssetDatabase::Get().FindAssetByObjectPath(LinkedAuxBus.AssetPath);
+						if (FoundAssetData.IsValid())
 						{
-							auto* BusAsset = Cast<UAkAuxBus>(OutBus.GetAsset());
-							BusAsset->bAutoLoad = false;
-							BusAsset->MarkPackageDirty();
+							if (auto* BusAsset = Cast<UAkAuxBus>(FoundAssetData.GetAsset()))
+							{
+								BusAsset->bAutoLoad = false;
+								MigrateSuccess = BusAsset->MarkPackageDirty();
+							}
+						}
+
+						if(!MigrateSuccess)
+						{
+							UE_LOG(LogAudiokineticTools, Warning, TEXT("MigrateAudioBanks: Could not successfully disable AutoLoad on AuxBus asset %s during migration. It will be automatically loaded."), *LinkedAuxBus.AssetPath);
 						}
 					}
-				}
-
-				for (auto& LinkedEvent : LinkedEvents)
-				{
-					if (!BankAsset->bAutoLoad)
+					for (auto& LinkedEvent : LinkedEvents)
 					{
-						TArray<FAssetData> Events;
-						AkAssetDatabase::Get().FindAssets(LinkedEvent.AssetGuid, Events);
-
-						for (FAssetData& Event : Events)
+						bool MigrateSuccess = false;
+						auto FoundAssetData = AkAssetDatabase::Get().FindAssetByObjectPath(LinkedEvent.AssetPath);
+						if (FoundAssetData.IsValid())
 						{
-							auto* EventAsset = Cast<UAkAuxBus>(Event.GetAsset());
-							EventAsset->bAutoLoad = false;
-							EventAsset->MarkPackageDirty();
+							if (auto* EventAsset = Cast<UAkAudioEvent>(FoundAssetData.GetAsset()))
+							{
+								EventAsset->bAutoLoad = false;
+								MigrateSuccess = EventAsset->MarkPackageDirty();
+							}
+						}
+
+						if (!MigrateSuccess)
+						{
+							UE_LOG(LogAudiokineticTools, Warning, TEXT("MigrateAudioBanks: Could not successfully disable AutoLoad on Event asset %s during migration. It will be automatically loaded."), *LinkedEvent.AssetPath);
 						}
 					}
 				}
 			}
 		}
-		
 		if (bCleanupAssets)
 		{
+			UE_LOG(LogAudiokineticTools, Display, TEXT("MigrateAudioBanks: Deleting deprecated AkAudioBank assets."));
 			TSet<FAssetData> ProjectBanks;
 			for (auto Bank : BanksToTransfer)
 			{
 				ProjectBanks.Add(Bank.Value.BankAssetData);
 			}
-			TArray<FAssetData> BanksToDelete = ProjectBanks.Difference(FailedBanks).Array();
-			ObjectTools::DeleteAssets(BanksToDelete, true);
-		}
-
-		if (FailedBanks.Num() > 0)
-		{
-			return false;
+			TArray<FAssetData> BanksToDelete = ProjectBanks.Array();
+			DeleteAssets(BanksToDelete);
 		}
 		return true;
 	}
@@ -236,7 +413,11 @@ namespace AkAssetMigration
 		auto& AssetRegistry = AssetRegistryModule.Get();
 
 		TArray<FAssetData> Banks;
+#if UE_5_1_OR_LATER
+		AssetRegistry.GetAssetsByClass(UAkAudioBank::StaticClass()->GetClassPathName(), Banks);
+#else
 		AssetRegistry.GetAssetsByClass(UAkAudioBank::StaticClass()->GetFName(), Banks);
+#endif
 		for (FAssetData& BankData : Banks)
 		{
 			FString BankName = BankData.AssetName.ToString();
@@ -244,7 +425,11 @@ namespace AkAssetMigration
 		}
 
 		TArray< FAssetData> Events;
+#if UE_5_1_OR_LATER
+		AssetRegistry.GetAssetsByClass(UAkAudioEvent::StaticClass()->GetClassPathName(), Events);
+#else
 		AssetRegistry.GetAssetsByClass(UAkAudioEvent::StaticClass()->GetFName(), Events);
+#endif
 		for (FAssetData EventData : Events)
 		{
 			if (UAkAudioEvent* Event = Cast<UAkAudioEvent>(EventData.GetAsset()))
@@ -252,7 +437,7 @@ namespace AkAssetMigration
 				if (Event->RequiredBank_DEPRECATED != nullptr)
 				{
 					FString BankName = Event->RequiredBank_DEPRECATED->GetName();
-					FLinkedAssetEntry EventEntry = { Event->GetName(), Event->EventInfo.AssetGuid };
+					FLinkedAssetEntry EventEntry = { Event->GetName(), Event->EventInfo.WwiseGuid, Event->GetPathName() };
 
 					if (BanksToTransfer.Contains(BankName))
 					{
@@ -268,7 +453,11 @@ namespace AkAssetMigration
 		}
 
 		TArray< FAssetData> AuxBusses;
+#if UE_5_1_OR_LATER
+		AssetRegistry.GetAssetsByClass(UAkAuxBus::StaticClass()->GetClassPathName(), AuxBusses);
+#else
 		AssetRegistry.GetAssetsByClass(UAkAuxBus::StaticClass()->GetFName(), AuxBusses);
+#endif
 		for (FAssetData AuxBusData : AuxBusses)
 		{
 			if (UAkAuxBus* AuxBus = Cast<UAkAuxBus>(AuxBusData.GetAsset()))
@@ -276,8 +465,7 @@ namespace AkAssetMigration
 				if (AuxBus->RequiredBank_DEPRECATED != nullptr)
 				{
 					FString BankName = AuxBus->RequiredBank_DEPRECATED->GetName();
-					FLinkedAssetEntry AuxBusEntry = { AuxBus->GetName(), AuxBus->AuxBusInfo.AssetGuid };
-
+					FLinkedAssetEntry AuxBusEntry = { AuxBus->GetName(), AuxBus->AuxBusInfo.WwiseGuid, AuxBus->GetPathName() };
 					if (BanksToTransfer.Contains(BankName))
 					{
 						BanksToTransfer[BankName].LinkedAuxBusses.Add(AuxBusEntry);
@@ -290,125 +478,90 @@ namespace AkAssetMigration
 				}
 			}
 		}
+		UE_LOG(LogAudiokineticTools, Display, TEXT("MigrateAudioBanks: Found %d SoundBank assets in project."), BanksToTransfer.Num());
 	}
 
-	void TransferUserBanksToWwise(EBankTransferMode TransferMode, const TMap<FString, FBankEntry>& InBanksToTransfer, TSet<FAssetData>& OutFailedBanks, const bool& bIncludeMedia)
+	TArray<FBankTransferError> TransferUserBanksWaapi(const TMap<FString, FBankEntry>& InBanksToTransfer, TSet<FAssetData>& OutFailedBanks, const bool bIncludeMedia)
 	{
-		TUniquePtr<IFileHandle> FileWriter;
-
-		if (TransferMode == EBankTransferMode::DefinitionFile)
-		{
-			FString FileLocation;
-			//Popup window to get file location
-			if (!GetDefinitionFilePath(FileLocation))
-			{
-				//User aborted file selection, exit
-				return;
-			}
-
-			// open file to start writing
-			IPlatformFile* PlatformFile = &FPlatformFileManager::Get().GetPlatformFile();;
-			FileWriter = TUniquePtr<IFileHandle>(PlatformFile->OpenWrite(*FileLocation));
-		}
-
+		UE_LOG(LogAudiokineticTools, Display, TEXT("MigrateAudioBanks: Transfering SoundBanks with WAAPI."));
+		TArray<FBankTransferError> ErrorMessages;
 		for (TPair<FString, FBankEntry > BankEntry : InBanksToTransfer)
 		{
 			FGuid BankID;
-			if (TransferMode == EBankTransferMode::WAAPI)
+			if (!CreateBankWaapi(BankEntry.Key, BankEntry.Value, BankID, ErrorMessages))
 			{
-				if (!CreateBankWaapi(BankEntry.Key, BankEntry.Value, BankID))
-				{
-					OutFailedBanks.Add(BankEntry.Value.BankAssetData);
-					continue;
-				}
-				if (!SetBankIncludesWaapi(BankEntry.Value, BankID, bIncludeMedia))
-				{
-					OutFailedBanks.Add(BankEntry.Value.BankAssetData);
-				}
+				OutFailedBanks.Add(BankEntry.Value.BankAssetData);
+				continue;
 			}
-			else
+			if (!SetBankIncludesWaapi(BankEntry.Value, BankID, bIncludeMedia, ErrorMessages))
 			{
-				WriteBankDefinition(BankEntry.Value, BankID, FileWriter, bIncludeMedia);
+				OutFailedBanks.Add(BankEntry.Value.BankAssetData);
 			}
 		}
-
-		if (TransferMode == EBankTransferMode::DefinitionFile)
-		{
-			FileWriter->Flush();
-		}
+		SaveProjectWaapi(ErrorMessages);
+		return ErrorMessages;
 	}
 
-	bool GetDefinitionFilePath(FString& OutFilePath)
+	EDefinitionFileCreationResult WriteBankDefinitionFile(const TMap<FString, FBankEntry>& InBanksToTransfer, const bool bIncludeMedia, const FString DefinitionFilePath)
 	{
-
-		FString FileTypes;
-		FString AllExtensions;
-
-		bool bAllowMultiSelect = false;
-
-		FileTypes = TEXT("TSV Files (*.tsv)|*.tsv");
-
-		FString DefaultFolder = "C:";
-		FString DefaultFile = "SoundBankDefinitions.tsv";
-
-		// Prompt the user for the filenames
-		TArray<FString> OpenFileNames;
-		IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
-		bool bOpened = false;
-		if (DesktopPlatform)
+		UE_LOG(LogAudiokineticTools, Display, TEXT("MigrateAudioBanks: Writing SoundBanks Definition File to '%s'."), *DefinitionFilePath);
+		// open file to start writing
+		IPlatformFile* PlatformFile = &FPlatformFileManager::Get().GetPlatformFile();;
+		FString FileLocation =  IFileManager::Get().ConvertToRelativePath(*DefinitionFilePath);
+		TUniquePtr<IFileHandle> FileWriter = TUniquePtr<IFileHandle>(PlatformFile->OpenWrite(*FileLocation));
+		if (!FileWriter.IsValid())
 		{
-			void* ParentWindowWindowHandle = NULL;
-
-			IMainFrameModule& MainFrameModule = FModuleManager::LoadModuleChecked<IMainFrameModule>(TEXT("MainFrame"));
-			const TSharedPtr<SWindow>& MainFrameParentWindow = MainFrameModule.GetParentWindow();
-			if (MainFrameParentWindow.IsValid() && MainFrameParentWindow->GetNativeWindow().IsValid())
-			{
-				ParentWindowWindowHandle = MainFrameParentWindow->GetNativeWindow()->GetOSWindowHandle();
-			}
-
-			const FString Title = TEXT("Choose location for definition file");
-			bOpened = DesktopPlatform->SaveFileDialog(
-				ParentWindowWindowHandle,
-				Title,
-				*DefaultFolder,
-				*DefaultFile,
-				FileTypes,
-				bAllowMultiSelect,
-				OpenFileNames
-			);
-		}
-		if (bOpened)
-		{
-			OutFilePath = OpenFileNames[0];
+			return OpenFailure;
 		}
 
-		return bOpened;
+		bool bWriteSuccess = true;
+		for (TPair<FString, FBankEntry > BankEntry : InBanksToTransfer)
+		{
+			bWriteSuccess &= WriteBankDefinition(BankEntry.Value, FileWriter, bIncludeMedia);
+		}
+
+		if (!bWriteSuccess)
+		{
+			return WriteFailure;
+		}
+
+		FileWriter->Flush();
+		return Success;
 	}
 
-
-	bool WriteBankDefinition(const FBankEntry& BankEntry, FGuid& OutBankGuid, TUniquePtr<IFileHandle>& FileWriter, const bool& bIncludeMedia)
+	bool WriteBankDefinition(const FBankEntry& BankEntry, TUniquePtr<IFileHandle>& FileWriter, const bool bIncludeMedia)
 	{
+		bool bWriteSuccess = true;
 		FString MediaString = bIncludeMedia? "\tMedia": "";
 		for (FLinkedAssetEntry Event : BankEntry.LinkedEvents)
 		{
 			auto Line = BankEntry.BankAssetData.AssetName.ToString() + TEXT("\t\"") + Event.AssetName + TEXT("\"") + TEXT("\tEvent") + MediaString + TEXT("\tStructure") + LINE_TERMINATOR;
 			FTCHARToUTF8 Utf8Formatted(*Line);
-			FileWriter->Write(reinterpret_cast<const uint8*>(Utf8Formatted.Get()), Utf8Formatted.Length());
+			bWriteSuccess &= FileWriter->Write(reinterpret_cast<const uint8*>(Utf8Formatted.Get()), Utf8Formatted.Length());
 		}
 		for (FLinkedAssetEntry Bus : BankEntry.LinkedAuxBusses)
 		{
 			auto Line = BankEntry.BankAssetData.AssetName.ToString() + TEXT("\t-AuxBus\t\"") + Bus.AssetName + TEXT("\"") + MediaString + TEXT("\tStructure") + LINE_TERMINATOR;
 			FTCHARToUTF8 Utf8Formatted(*Line);
-			FileWriter->Write(reinterpret_cast<const uint8*>(Utf8Formatted.Get()), Utf8Formatted.Length());
+			bWriteSuccess &= FileWriter->Write(reinterpret_cast<const uint8*>(Utf8Formatted.Get()), Utf8Formatted.Length());
 		}
-		return true;
+		return bWriteSuccess;
 	}
 
-	bool CreateBankWaapi(const FString& BankName, const FBankEntry& BankEntry, FGuid& OutBankGuid)
+	bool CreateBankWaapi(const FString& BankName, const FBankEntry& BankEntry, FGuid& OutBankGuid, TArray<FBankTransferError>& ErrorMessages)
 	{
+#if AK_SUPPORT_WAAPI
 		FAkWaapiClient* WaapiClient = FAkWaapiClient::Get();
 		if (!WaapiClient)
 		{
+			UE_LOG(LogAudiokineticTools, Warning, TEXT("Failed to create SoundBank for <%s>. \nCould not get WAAPI Client."), *BankEntry.BankAssetData.PackageName.ToString());
+			ErrorMessages.Add({"Could not get WAAPI Client", true, BankEntry});
+			return false;
+		}
+		else if (!WaapiClient->IsConnected())
+		{
+			UE_LOG(LogAudiokineticTools, Warning, TEXT("Failed to create SoundBank for <%s>. \nWAAPI Client not connected."), *BankEntry.BankAssetData.PackageName.ToString());
+			ErrorMessages.Add({"WAAPI Client not connected", true, BankEntry});
 			return false;
 		}
 
@@ -418,44 +571,64 @@ namespace AkAssetMigration
 		Args->SetStringField(WwiseWaapiHelper::TYPE,  WwiseWaapiHelper::SOUNDBANK_TYPE);
 		Args->SetStringField(WwiseWaapiHelper::NAME, BankName);
 
-#if AK_SUPPORT_WAAPI
 		TSharedRef<FJsonObject> Options = MakeShared<FJsonObject>();
 		TSharedPtr<FJsonObject> Result;
+		FString IdString;
 		if (!WaapiClient->Call(ak::wwise::core::object::create, Args, Options, Result))
 		{
-			UE_LOG(LogAudiokineticTools, Warning, TEXT("Failed to create SoundBank for <%s>, it will not be deleted."), *BankEntry.BankAssetData.PackageName.ToString());
-
+			FString ErrorMessage;
+			if (Result.IsValid())
+			{
+				Result->TryGetStringField(TEXT("message"), ErrorMessage);
+			}
+			UE_LOG(LogAudiokineticTools, Warning, TEXT("Failed to create SoundBank for <%s>.\nMessage : <%s>."), *BankEntry.BankAssetData.PackageName.ToString(), *ErrorMessage);
+			ErrorMessages.Add({ErrorMessage, true, BankEntry});
 			return false;
 		}
-		FString IdString;
-		if (!Result->TryGetStringField(WwiseWaapiHelper::ID, IdString))
+
+		if (Result.IsValid() && !Result->TryGetStringField(WwiseWaapiHelper::ID, IdString))
 		{
 			FString ErrorMessage;
-			Result->TryGetStringField(TEXT("message"), ErrorMessage);
-			UE_LOG(LogAudiokineticTools, Warning, TEXT("Failed to create SoundBank for <%s>, it will not be deleted.\nMessage : <%s>."), *BankEntry.BankAssetData.PackageName.ToString(), *ErrorMessage);
-
+			if (Result.IsValid())
+			{
+				Result->TryGetStringField(TEXT("message"), ErrorMessage);
+			}			
+			UE_LOG(LogAudiokineticTools, Warning, TEXT("Failed to create SoundBank for <%s>.\nMessage : <%s>."), *BankEntry.BankAssetData.PackageName.ToString(), *ErrorMessage);
+			ErrorMessages.Add({ErrorMessage, true, BankEntry});
 			return false; // error parsing Json
 		}
-
 		FGuid::ParseExact(IdString, EGuidFormats::DigitsWithHyphensInBraces, OutBankGuid);
-#endif
 		return true;
+#else
+		UE_LOG(LogAudiokineticTools, Error, TEXT("SetBankIncludesWaapi: WAAPI not supported"));
+		ErrorMessages.Add({TEXT("WAAPI not supported"), false, {}});
+		return false;
+#endif
 	}
 
-	bool SetBankIncludesWaapi(const FBankEntry& BankEntry, const FGuid& BankId, const bool& bIncludeMedia)
+	bool SetBankIncludesWaapi(const FBankEntry& BankEntry, const FGuid& BankId, const bool bIncludeMedia, TArray<FBankTransferError>& ErrorMessages)
 	{
+#if AK_SUPPORT_WAAPI
 		FAkWaapiClient* WaapiClient = FAkWaapiClient::Get();
 		if (!WaapiClient)
 		{
+			UE_LOG(LogAudiokineticTools, Warning, TEXT("WAAPI command to add Wwise objects to SoundBank '%s' failed. \nCould not get WAAPI Client."), *BankEntry.BankAssetData.PackageName.ToString());
+			ErrorMessages.Add({"Could not get WAAPI Client", true, BankEntry});
+			return false;
+		}
+		else if (!WaapiClient->IsConnected())
+		{
+			UE_LOG(LogAudiokineticTools, Warning, TEXT("WAAPI command to add Wwise objects to SoundBank '%s' failed. \nWAAPI Client not connected."), *BankEntry.BankAssetData.PackageName.ToString());
+			ErrorMessages.Add({"WAAPI Client not connected", true, BankEntry});
 			return false;
 		}
 
 		TSet<FString> IncludeIds;
 		for (FLinkedAssetEntry Event : BankEntry.LinkedEvents)
 		{
-			if (Event.AssetGuid.IsValid())
+			if (Event.WwiseGuid.IsValid())
 			{
-				IncludeIds.Add(Event.AssetGuid.ToString(EGuidFormats::DigitsWithHyphensInBraces));
+				IncludeIds.Add(Event.WwiseGuid.ToString(EGuidFormats::DigitsWithHyphensInBraces));
 			}
 			else
 			{
@@ -465,9 +638,9 @@ namespace AkAssetMigration
 
 		for (FLinkedAssetEntry AuxBus : BankEntry.LinkedAuxBusses)
 		{
-			if (AuxBus.AssetGuid.IsValid())
+			if (AuxBus.WwiseGuid.IsValid())
 			{
-				IncludeIds.Add(AuxBus.AssetGuid.ToString(EGuidFormats::DigitsWithHyphensInBraces));
+				IncludeIds.Add(AuxBus.WwiseGuid.ToString(EGuidFormats::DigitsWithHyphensInBraces));
 			}
 			else
 			{
@@ -501,24 +674,71 @@ namespace AkAssetMigration
 		Args->SetStringField(WwiseWaapiHelper::OPERATION, TEXT("add"));
 		Args->SetArrayField(WwiseWaapiHelper::INCLUSIONS, IncludeIdJson);
 
-#if AK_SUPPORT_WAAPI
 		TSharedRef<FJsonObject> Options = MakeShared<FJsonObject>();
 		TSharedPtr<FJsonObject> Result;
 		if (!WaapiClient->Call(ak::wwise::core::soundbank::setInclusions, Args, Options, Result))
 		{
 			FString ErrorMessage;
-			Result->TryGetStringField(TEXT("message"), ErrorMessage);
-			UE_LOG(LogAudiokineticTools, Log, TEXT("Failed to include wwise objects in SoundBank <%s>, it will not be deleted.\nMessage : <%s>."), *BankEntry.BankAssetData.PackageName.ToString(), *ErrorMessage);
+			if (Result.IsValid())
+			{
+				Result->TryGetStringField(TEXT("message"), ErrorMessage);
+			}
+			UE_LOG(LogAudiokineticTools, Warning, TEXT("WAAPI command to add Wwise objects to SoundBank '%s' failed. \nError Message : <%s>."), *BankEntry.BankAssetData.PackageName.ToString(), *ErrorMessage);
+			ErrorMessages.Add({ErrorMessage, true, BankEntry});
 			return false;
 		}
-#endif
-
 		return true;
-	}
-		
-	bool MigrateProjectSettings(FString& ProjectContent, const bool& bWasUsingEBP, const bool& bUseGeneratedSubFolders)
-	{
 
+#else
+		UE_LOG(LogAudiokineticTools, Error, TEXT("SetBankIncludesWaapi: WAAPI not supported"));
+		ErrorMessages.Add({TEXT("WAAPI not supported"), false, {}});
+		return false;
+#endif
+	}
+	
+	bool SaveProjectWaapi(TArray<FBankTransferError>& ErrorMessages)
+	{
+#if AK_SUPPORT_WAAPI
+		FAkWaapiClient* WaapiClient = FAkWaapiClient::Get();
+		if (!WaapiClient)
+		{
+			UE_LOG(LogAudiokineticTools, Warning, TEXT("Failed to save Wwise project.\n Could not get Waapi Client."));
+			ErrorMessages.Add({TEXT("Failed to save Wwise project over WAAPI. Please save the project manually."), false, {}});
+			return false;
+		}
+		else if (!WaapiClient->IsConnected())
+		{
+			UE_LOG(LogAudiokineticTools, Warning, TEXT("Failed to save Wwise project.\n Waapi Client not connected."));
+			ErrorMessages.Add({TEXT("Failed to save Wwise project over WAAPI. Please save the project manually."), false, {}});
+			return false;
+		}
+
+		TSharedRef<FJsonObject> Args = MakeShared<FJsonObject>(); 
+		TSharedRef<FJsonObject> Options = MakeShared<FJsonObject>();
+		TSharedPtr<FJsonObject> Result;
+		FString IdString;
+		if (!WaapiClient->Call(ak::wwise::core::project::save, Args, Options, Result))
+		{
+			FString ErrorMessage;
+			if (Result.IsValid())
+			{
+				Result->TryGetStringField(TEXT("message"), ErrorMessage);
+			}
+			UE_LOG(LogAudiokineticTools, Warning, TEXT("Failed to save Wwise project.\nMessage : <%s>."), *ErrorMessage);
+			ErrorMessages.Add({TEXT("Failed to save Wwise project over WAAPI. Please save the project manually."), false, {}});
+			ErrorMessages.Add({ErrorMessage, false, {}});
+			return false;
+		}
+		return true;
+#else
+		UE_LOG(LogAudiokineticTools, Error, TEXT("SetBankIncludesWaapi: WAAPI not supported"));
+		ErrorMessages.Add({TEXT("WAAPI not supported"), false, {}});
+		return false;
+#endif
+	}
+
+	bool MigrateProjectSettings(FString& ProjectContent, const bool bWasUsingEBP, const bool bUseGeneratedSubFolders, const FString& GeneratedSoundBanksFolder )
+	{
 		//migrate split media per id
 		TArray<PropertyToChange> PropertiesToAdd;
 		if (bWasUsingEBP)
@@ -632,7 +852,7 @@ namespace AkAssetMigration
 					}
 					else
 					{
-						UE_LOG(LogAudiokineticTools, Log, TEXT("Could not change value for %s in Wwise project. Some features might not work properly."), *ItemToAdd.Name);
+						UE_LOG(LogAudiokineticTools, Warning, TEXT("Could not change value for %s in Wwise project. Some features might not work properly."), *ItemToAdd.Name);
 					}
 				}
 			}

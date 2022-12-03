@@ -1,18 +1,19 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
-Copyright (c) 2021 Audiokinetic Inc.
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
+Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
-
 
 #include "AkSettings.h"
 
@@ -23,7 +24,7 @@ Copyright (c) 2021 Audiokinetic Inc.
 #include "AkAudioModule.h"
 #include "AkSettingsPerUser.h"
 #include "AkUnrealHelper.h"
-#include "AssetRegistryModule.h"
+#include "AssetRegistry/AssetRegistryModule.h"
 #include "Framework/Docking/TabManager.h"
 #include "StringMatchAlgos/Array2D.h"
 #include "StringMatchAlgos/StringMatching.h"
@@ -174,7 +175,11 @@ namespace AkSettings_Helper
 	void MigrateMultiCoreRendering(bool EnableMultiCoreRendering, const FString& PlatformName)
 	{
 		FString SettingsClassName = FString::Format(TEXT("Ak{0}InitializationSettings"), { *PlatformName });
+#if UE_5_1_OR_LATER
+		auto* SettingsClass = UClass::TryFindTypeSlow<UClass>(*SettingsClassName);
+#else
 		auto* SettingsClass = FindObject<UClass>(ANY_PACKAGE, *SettingsClassName);
+#endif
 		if (!SettingsClass)
 		{
 			return;
@@ -403,6 +408,41 @@ void UAkSettings::PreEditChange(FProperty* PropertyAboutToChange)
 }
 
 #define LOCTEXT_NAMESPACE "AkAudio"
+
+bool UAkSettings::UpdateGeneratedSoundBanksPath(FString Path)
+{
+	PreviousWwiseGeneratedSoundBankFolder = GeneratedSoundBanksFolder.Path;
+	GeneratedSoundBanksFolder.Path = Path;
+	return UpdateGeneratedSoundBanksPath();
+}
+
+bool UAkSettings::GeneratedSoundBanksPathExists() const
+{
+	return FPaths::DirectoryExists(AkUnrealHelper::GetSoundBankDirectory());
+}
+
+bool UAkSettings::AreSoundBanksGenerated() const
+{
+	return FPaths::FileExists(FPaths::Combine(AkUnrealHelper::GetSoundBankDirectory(), TEXT("ProjectInfo.json")));
+}
+
+bool UAkSettings::UpdateGeneratedSoundBanksPath()
+{
+	bool bPathChanged = AkUnrealEditorHelper::SanitizeFolderPathAndMakeRelativeToContentDir(
+		GeneratedSoundBanksFolder.Path, PreviousWwiseGeneratedSoundBankFolder, 
+		FText::FromString("Please enter a valid directory path"));
+			
+	if (bPathChanged)
+	{
+		OnGeneratedSoundBanksPathChanged.Broadcast();
+	}
+	else
+	{
+		UE_LOG(LogAkAudio, Log, TEXT("AkSettings: The given GeneratedSoundBanks folder was the same as the previous one."));
+	}
+	return bPathChanged;
+}
+
 void UAkSettings::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
 	const FName PropertyName = (PropertyChangedEvent.Property != nullptr) ? PropertyChangedEvent.Property->GetFName() : NAME_None;
@@ -479,14 +519,7 @@ void UAkSettings::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedE
 
 	else if (MemberPropertyName == GET_MEMBER_NAME_CHECKED(UAkSettings, GeneratedSoundBanksFolder))
 	{
-		bool bPathChanged = AkUnrealEditorHelper::SanitizeFolderPathAndMakeRelativeToContentDir(
-			GeneratedSoundBanksFolder.Path, PreviousWwiseGeneratedSoundBankFolder, 
-			FText::FromString("Please enter a valid directory path"));
-			
-		if (bPathChanged)
-		{
-			OnGeneratedSoundBanksPathChanged.Broadcast();
-		}
+		UpdateGeneratedSoundBanksPath();
 	}
 	Super::PostEditChangeProperty(PropertyChangedEvent);
 }
@@ -551,29 +584,44 @@ void UAkSettings::FillAkGeometryMap(
 
 void UAkSettings::UpdateAkGeometryMap()
 {
-	AkGeometryMap.Empty();
-	for (auto& elem : PhysicalMaterialAcousticTextureMap)
+	decltype(AkGeometryMap) UpdatedGeometryMap;
+	for (const auto& AcousticTextureTuple : PhysicalMaterialAcousticTextureMap)
 	{
-		TSoftObjectPtr<class UPhysicalMaterial> physMatPtr(elem.Key);
-		TSoftObjectPtr<class UAkAcousticTexture> acousticTexPtr(elem.Value);
-		FAkGeometrySurfacePropertiesToMap props;
-		props.AcousticTexture = acousticTexPtr;
-		props.OcclusionValue = PhysicalMaterialOcclusionMap[elem.Key];
-		AkGeometryMap.Emplace(physMatPtr, props);
+		const auto* PhysicalMaterial(AcousticTextureTuple.Key);
+		const auto* AcousticTexture(AcousticTextureTuple.Value);
+		const auto* OcclusionPtr = PhysicalMaterialOcclusionMap.Find(PhysicalMaterial);
+		if (UNLIKELY(!OcclusionPtr))
+		{
+			UE_LOG(LogAkAudio, Warning, TEXT("UpdateAkGeometryMap: Could not find Occlusion of Physical Material %s with Acoustic Texture %s"),
+				PhysicalMaterial ? *PhysicalMaterial->GetFName().ToString() : TEXT("[nullptr]"),
+				AcousticTexture ? *AcousticTexture->GetFName().ToString() : TEXT("[nullptr]"));
+			continue;
+		}
+
+		FAkGeometrySurfacePropertiesToMap SurfaceProperties;
+		SurfaceProperties.AcousticTexture = AcousticTexture;
+		SurfaceProperties.OcclusionValue = *OcclusionPtr;
+		UpdatedGeometryMap.Emplace(PhysicalMaterial, MoveTemp(SurfaceProperties));
 	}
 
-	AkGeometryMap.KeySort([](const TSoftObjectPtr<class UPhysicalMaterial>& Lhs, const TSoftObjectPtr<class UPhysicalMaterial>& Rhs) {
-		UPhysicalMaterial* lhs = Lhs.Get();
-		UPhysicalMaterial* rhs = Rhs.Get();
-		if (lhs && rhs)
+	UpdatedGeometryMap.KeySort([](const auto& Lhs, const auto& Rhs) {
+		if (UNLIKELY(!Lhs.IsValid() || !Rhs.IsValid()))
 		{
-			return Lhs.Get()->GetFName().LexicalLess(Rhs.Get()->GetFName());
+			return !Lhs.IsValid();
 		}
-		else
-		{
-			return !lhs ? true : false;
-		}
+		return Lhs->GetPathName().Compare(Rhs->GetPathName()) < 0;
 	});
+
+	if (!UpdatedGeometryMap.OrderIndependentCompareEqual(AkGeometryMap))
+	{
+		UE_LOG(LogAkAudio, Verbose, TEXT("UpdateAkGeometryMap: Updating changed AkGeometryMap"));
+		AkGeometryMap = UpdatedGeometryMap;
+		AkUnrealEditorHelper::SaveConfigFile(this);
+	}
+	else
+	{
+		UE_LOG(LogAkAudio, VeryVerbose, TEXT("UpdateAkGeometryMap: AkGeometryMap is unchanged. Skip updating."));
+	}
 }
 
 void UAkSettings::InitAkGeometryMap()
@@ -593,8 +641,13 @@ void UAkSettings::InitAkGeometryMap()
 
 	// Obtain the 2 list of children we want to match
 	TArray<FAssetData> PhysicalMaterials, AcousticTextures;
+#if UE_5_1_OR_LATER
+	AssetRegistryModule->Get().GetAssetsByClass(UPhysicalMaterial::StaticClass()->GetClassPathName(), PhysicalMaterials);
+	AssetRegistryModule->Get().GetAssetsByClass(UAkAcousticTexture::StaticClass()->GetClassPathName(), AcousticTextures);
+#else
 	AssetRegistryModule->Get().GetAssetsByClass(UPhysicalMaterial::StaticClass()->GetFName(), PhysicalMaterials);
 	AssetRegistryModule->Get().GetAssetsByClass(UAkAcousticTexture::StaticClass()->GetFName(), AcousticTextures);
+#endif
 
 	FillAkGeometryMap(PhysicalMaterials, AcousticTextures);
 }
@@ -843,14 +896,18 @@ void UAkSettings::UpdateTextureColor(const FGuid& textureID)
 void UAkSettings::SetTextureColor(FGuid textureID, int colorIndex)
 {
 	TArray<FAssetData> AcousticTextures;
+#if UE_5_1_OR_LATER
+	AssetRegistryModule->Get().GetAssetsByClass(UAkAcousticTexture::StaticClass()->GetClassPathName(), AcousticTextures);
+#else
 	AssetRegistryModule->Get().GetAssetsByClass(UAkAcousticTexture::StaticClass()->GetFName(), AcousticTextures);
+#endif
 
 	FLinearColor color = FAkAudioStyle::GetWwiseObjectColor(colorIndex);
 	for (FAssetData& textureAsset : AcousticTextures)
 	{
 		if (UAkAcousticTexture* texture = Cast<UAkAcousticTexture>(textureAsset.GetAsset()))
 		{
-			if (texture->AcousticTextureInfo.AssetGuid == textureID && texture->EditColor != color)
+			if (texture->AcousticTextureInfo.WwiseGuid == textureID && texture->EditColor != color)
 			{
 				texture->Modify();
 				texture->EditColor = color;
@@ -930,7 +987,7 @@ void UAkSettings::DecayAuxBusMapChanged()
 	// If key value needs to be restricted, remove and replace the entry in the map.
 	if (restrictedKeyValue != newKeyValue)
 	{
-		FAkAudioStyle::DisplayEditorMessgae(FText::FromString(restrictionInfoString));
+		FAkAudioStyle::DisplayEditorMessage(FText::FromString(restrictionInfoString));
 		TSoftObjectPtr<UAkAuxBus> auxBusToMove = EnvironmentDecayAuxBusMap[newKeyValue];
 		EnvironmentDecayAuxBusMap.Remove(newKeyValue);
 		EnvironmentDecayAuxBusMap.Add(restrictedKeyValue, auxBusToMove);
@@ -954,40 +1011,56 @@ void UAkSettings::OnAssetAdded(const FAssetData& NewAssetData)
 	if (!bAkGeometryMapInitialized)
 		return;
 
+#if UE_5_1_OR_LATER
+	if (NewAssetData.AssetClassPath == UPhysicalMaterial::StaticClass()->GetClassPathName())
+#else
 	if (NewAssetData.AssetClass == UPhysicalMaterial::StaticClass()->GetFName())
+#endif
 	{
 		if (auto physicalMaterial = Cast<UPhysicalMaterial>(NewAssetData.GetAsset()))
 		{
 			TArray<FAssetData> PhysicalMaterials, AcousticTextures;
 			PhysicalMaterials.Add(NewAssetData);
+#if UE_5_1_OR_LATER
+			AssetRegistryModule->Get().GetAssetsByClass(UAkAcousticTexture::StaticClass()->GetClassPathName(), AcousticTextures);
+#else
 			AssetRegistryModule->Get().GetAssetsByClass(UAkAcousticTexture::StaticClass()->GetFName(), AcousticTextures);
+#endif
 
 			FillAkGeometryMap(PhysicalMaterials, AcousticTextures);
 		}
 	} 
+#if UE_5_1_OR_LATER
+	else if (NewAssetData.AssetClassPath == UAkAcousticTexture::StaticClass()->GetClassPathName())
+#else
 	else if (NewAssetData.AssetClass == UAkAcousticTexture::StaticClass()->GetFName())
+#endif
 	{
 		if (auto acousticTexture = Cast<UAkAcousticTexture>(NewAssetData.GetAsset()))
 		{
 			TArray<FAssetData> PhysicalMaterials, AcousticTextures;
+#if UE_5_1_OR_LATER
+			AssetRegistryModule->Get().GetAssetsByClass(UPhysicalMaterial::StaticClass()->GetClassPathName(), PhysicalMaterials);
+#else
 			AssetRegistryModule->Get().GetAssetsByClass(UPhysicalMaterial::StaticClass()->GetFName(), PhysicalMaterials);
+#endif
 			AcousticTextures.Add(NewAssetData);
 
 			FillAkGeometryMap(PhysicalMaterials, AcousticTextures);
 			FAkAcousticTextureParams params;
-			bool paramsExist = AcousticTextureParamsMap.Contains(acousticTexture->AcousticTextureInfo.AssetGuid);
+			bool paramsExist = AcousticTextureParamsMap.Contains(acousticTexture->AcousticTextureInfo.WwiseGuid);
 			if (paramsExist)
 			{
-				params = *AcousticTextureParamsMap.Find(acousticTexture->AcousticTextureInfo.AssetGuid);
-				params.shortID = acousticTexture->AcousticTextureInfo.AssetShortId;
+				params = *AcousticTextureParamsMap.Find(acousticTexture->AcousticTextureInfo.WwiseGuid);
+				params.shortID = acousticTexture->AcousticTextureInfo.WwiseShortId;
 			}
 #if AK_SUPPORT_WAAPI
-			bool paramsSet = WAAPIGetTextureParams(acousticTexture->AcousticTextureInfo.AssetGuid, params);
+			bool paramsSet = WAAPIGetTextureParams(acousticTexture->AcousticTextureInfo.WwiseGuid, params);
 			if (paramsSet && !paramsExist)
-				AcousticTextureParamsMap.Add(acousticTexture->AcousticTextureInfo.AssetGuid, params);
-			RegisterWaapiTextureCallback(acousticTexture->AcousticTextureInfo.AssetGuid);
+				AcousticTextureParamsMap.Add(acousticTexture->AcousticTextureInfo.WwiseGuid, params);
+			RegisterWaapiTextureCallback(acousticTexture->AcousticTextureInfo.WwiseGuid);
 			int colorIndex = -1;
-			if (WAAPIGetObjectColorIndex(acousticTexture->AcousticTextureInfo.AssetGuid, colorIndex))
+			if (WAAPIGetObjectColorIndex(acousticTexture->AcousticTextureInfo.WwiseGuid, colorIndex))
 			{
 				acousticTexture->EditColor = FAkAudioStyle::GetWwiseObjectColor(colorIndex);
 			}
@@ -998,7 +1071,11 @@ void UAkSettings::OnAssetAdded(const FAssetData& NewAssetData)
 
 void UAkSettings::OnAssetRemoved(const struct FAssetData& AssetData)
 {
+#if UE_5_1_OR_LATER
+	if (AssetData.AssetClassPath == UPhysicalMaterial::StaticClass()->GetClassPathName())
+#else
 	if (AssetData.AssetClass == UPhysicalMaterial::StaticClass()->GetFName())
+#endif
 	{
 		if (auto physicalMaterial = Cast<UPhysicalMaterial>(AssetData.GetAsset()))
 		{
@@ -1007,13 +1084,17 @@ void UAkSettings::OnAssetRemoved(const struct FAssetData& AssetData)
 			UpdateAkGeometryMap();
 		}
 	}
+#if UE_5_1_OR_LATER
+	else if(AssetData.AssetClassPath == UAkAcousticTexture::StaticClass()->GetClassPathName())
+#else
 	else if(AssetData.AssetClass == UAkAcousticTexture::StaticClass()->GetFName())
+#endif
 	{
 		if(auto acousticTexture = Cast<UAkAcousticTexture>(AssetData.GetAsset()))
 		{
-			AcousticTextureParamsMap.Remove(acousticTexture->AcousticTextureInfo.AssetGuid);
+			AcousticTextureParamsMap.Remove(acousticTexture->AcousticTextureInfo.WwiseGuid);
 #if AK_SUPPORT_WAAPI
-			UnregisterWaapiTextureCallback(acousticTexture->AcousticTextureInfo.AssetGuid);
+			UnregisterWaapiTextureCallback(acousticTexture->AcousticTextureInfo.WwiseGuid);
 #endif
 		}
 	}

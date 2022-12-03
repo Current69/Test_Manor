@@ -1,16 +1,18 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
-Copyright (c) 2021 Audiokinetic Inc.
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
+Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
 #include "AkGeometryComponent.h"
@@ -24,11 +26,11 @@ Copyright (c) 2021 Audiokinetic Inc.
 #include "Engine/Polys.h"
 #include "Engine/StaticMesh.h"
 
-#if PHYSICS_INTERFACE_PHYSX
+#if AK_USE_PHYSX
 #include "PhysXPublic.h"
 #endif
 
-#if WITH_CHAOS
+#if AK_USE_CHAOS
 #include "Chaos/Convex.h"
 #include "Chaos/Particles.h"
 #include "Chaos/Plane.h"
@@ -53,7 +55,7 @@ UAkGeometryComponent::UAkGeometryComponent(const class FObjectInitializer& Objec
 	// Property initialization
 	bWantsOnUpdateTransform = true;
 
-	MeshType = AkMeshType::StaticMesh;
+	MeshType = AkMeshType::CollisionMesh;
 	LOD = 0;
 	CollisionMeshSurfaceOverride.AcousticTexture = nullptr;
 	CollisionMeshSurfaceOverride.bEnableOcclusionOverride = false;
@@ -132,7 +134,13 @@ void UAkGeometryComponent::BeginPlayInternal()
 	for (int PosIndex = 0; PosIndex < GeometryData.Surfaces.Num(); ++PosIndex)
 	{
 		// set geometry surface names and update textures
-		GeometryData.Surfaces[PosIndex].Name = GetOwner()->GetName() + GetName() + FString::FromInt(PosIndex);
+		FString OwnerName;
+#if WITH_EDITOR
+		OwnerName = GetOwner()->GetActorLabel();
+#else
+		OwnerName = GetOwner()->GetName();
+#endif
+		GeometryData.Surfaces[PosIndex].Name = OwnerName + GetName() + FString::FromInt(PosIndex);
 
 		UPhysicalMaterial* physMat = GeometryData.ToOverrideAcousticTexture[PosIndex];
 		if (physMat)
@@ -581,7 +589,7 @@ struct VertexIndexByAngle
 	float Angle;
 }; 
 
-#if PHYSICS_INTERFACE_PHYSX
+#if AK_USE_PHYSX
 void ConvertConvexMeshToGeometryData(AkSurfIdx surfIdx, const FKConvexElem& convexHull, FAkGeometryData* GeometryData)
 {
 	physx::PxConvexMesh* convexMesh = convexHull.GetConvexMesh();
@@ -692,116 +700,6 @@ void ConvertConvexMeshToGeometryData(AkSurfIdx surfIdx, const FKConvexElem& conv
 			convexHull.GetTransform().Rotator());
 	}
 }
-#elif WITH_CHAOS
-void ConvertConvexMeshToGeometryData(AkSurfIdx surfIdx, const FKConvexElem& convexHull, FAkGeometryData* GeometryData)
-{
-	auto convexMesh = convexHull.GetChaosConvexMesh();
-
-	AkVertIdx initialVertIdx = GeometryData->Vertices.Num();
-	if (convexMesh.IsValid())
-	{
-		const auto& Vertices = convexMesh->GetVertices();
-
-		TArray<TArray<int32>> FaceIndices;
-		TArray<Chaos::TPlaneConcrete<Chaos::FRealSingle, 3>> Planes;
-		TArray<Chaos::TVec3<Chaos::FRealSingle>> SurfaceVertices;
-		Chaos::TAABB<Chaos::FRealSingle, 3> LocalBoundingBox;
-		Chaos::FConvexBuilder::Build(Vertices, Planes, FaceIndices, SurfaceVertices, LocalBoundingBox);
-
-
-		for (int32 vertexIdx = 0; vertexIdx < Vertices.Num(); ++vertexIdx)
-		{
-			FVector akvtx;
-			akvtx.X = Vertices[vertexIdx].X;
-			akvtx.Y = Vertices[vertexIdx].Y;
-			akvtx.Z = Vertices[vertexIdx].Z;
-			GeometryData->Vertices.Add(akvtx);
-		}
-
-		for (int32 faceIdx = 0; faceIdx < FaceIndices.Num(); faceIdx++)
-		{
-			auto face = FaceIndices[faceIdx];
-			// order the vertices of the polygon
-			uint32 numVertsInPoly = face.Num();
-
-			TArray<VertexIndexByAngle> orderedIndexes;
-			// first element is first vertex index
-			AkVertIdx firstVertIdx = face[0];
-			orderedIndexes.Add(VertexIndexByAngle{ firstVertIdx, 0 });
-
-			// get the center of the polygon
-			FVector center(0, 0, 0);
-			for (uint32 polyVertIdx = 0; polyVertIdx < numVertsInPoly; ++polyVertIdx)
-			{
-				auto vertIdx = face[polyVertIdx];
-				center.X = Vertices[vertIdx].X;
-				center.Y = Vertices[vertIdx].Y;
-				center.Z = Vertices[vertIdx].Z;
-			}
-			center.X /= numVertsInPoly;
-			center.Y /= numVertsInPoly;
-			center.Z /= numVertsInPoly;
-
-			// get the vector from center to the first vertex
-			FVector v0;
-			v0.X = Vertices[firstVertIdx].X - center.X;
-			v0.Y = Vertices[firstVertIdx].Y - center.Y;
-			v0.Z = Vertices[firstVertIdx].Z - center.Z;
-			v0.Normalize();
-
-			// get the normal of the plane
-			FVector n = FVector(Planes[faceIdx].Normal());
-			n.Normalize();
-
-			// find the angles between v0 and the other vertices of the polygon
-			for (uint32 polyVertIdx = 1; polyVertIdx < numVertsInPoly; polyVertIdx++)
-			{
-				// get the vector from center to the current vertex
-				AkVertIdx vertIdx = face[polyVertIdx];
-				FVector v1;
-				v1.X = Vertices[vertIdx].X - center.X;
-				v1.Y = Vertices[vertIdx].Y - center.Y;
-				v1.Z = Vertices[vertIdx].Z - center.Z;
-				v1.Normalize();
-
-				// get the angle between v0 and v1
-				// to do so, we need the dot product and the determinant respectively proportional to cos and sin of the angle.
-				// atan2(sin, cos) will give us the angle
-				float dot = FVector::DotProduct(v0, v1);
-				// the determinant of two 3D vectors in the same plane can be found with the dot product of the normal with the result of
-				// a cross product between the vectors
-				float det = FVector::DotProduct(n, FVector::CrossProduct(v0, v1));
-				float angle = (float)atan2(det, dot);
-
-				orderedIndexes.Add(VertexIndexByAngle{ vertIdx, angle });
-			}
-
-			orderedIndexes.Sort();
-
-			// fan triangulation
-			for (uint32 vertIdx = 1; vertIdx < numVertsInPoly - 1; ++vertIdx)
-			{
-				FAkTriangle tri;
-				tri.Point0 = (AkVertIdx)orderedIndexes[0].Index + initialVertIdx;
-				tri.Point1 = (AkVertIdx)orderedIndexes[vertIdx].Index + initialVertIdx;
-				tri.Point2 = (AkVertIdx)orderedIndexes[vertIdx + 1].Index + initialVertIdx;
-				tri.Surface = surfIdx;
-
-				GeometryData->Triangles.Add(tri);
-			}
-		}
-	}
-	else
-	{
-		// bounding box
-		GeometryData->AddBox(surfIdx,
-			convexHull.ElemBox.GetCenter(),
-			convexHull.ElemBox.GetExtent(),
-			convexHull.GetTransform().Rotator());
-	}
-}
-#else
-#error "The Wwise Unreal integration is only compatible with PhysX or Chaos physics engines"
 #endif
 
 bool operator<(const VertexIndexByAngle& lhs, const VertexIndexByAngle& rhs)
@@ -886,32 +784,41 @@ void UAkGeometryComponent::ConvertCollisionMesh(UPrimitiveComponent* PrimitiveCo
 	for (int32 i = 0; i < numConvexElems; i++)
 	{
 		FKConvexElem& convexElem = bodySetup->AggGeom.ConvexElems[i];
-		int32 numVertices = convexElem.VertexData.Num();
-		int32 numTriangles = convexElem.IndexData.Num() / 3;
-		if (numVertices == 0 || numTriangles == 0)
-		{
-			ConvertConvexMeshToGeometryData(surfIdx, convexElem, &GeometryData);
-		}
-		else
-		{
-			int32 vertexOffset = GeometryData.Vertices.Num();
-			for (int32 vertIdx = 0; vertIdx < numVertices; ++vertIdx)
-			{
-				GeometryData.Vertices.Add(convexElem.GetTransform().TransformPosition(convexElem.VertexData[vertIdx]));
-			}
-			for (int32 triIdx = 0; triIdx < numTriangles; ++triIdx)
-			{
-				FAkTriangle tri;
-				tri.Point0 = vertexOffset + convexElem.IndexData[3 * triIdx];
-				tri.Point1 = vertexOffset + convexElem.IndexData[3 * triIdx + 1];
-				tri.Point2 = vertexOffset + convexElem.IndexData[3 * triIdx + 2];
-				tri.Surface = surfIdx;
 
-				GeometryData.Triangles.Add(tri);
-			}
+		int32 numVertices = convexElem.VertexData.Num();
+		if (numVertices == 0)
+			continue;
+
+#if AK_USE_CHAOS
+		// will compute IndexData if it is empty
+		convexElem.ComputeChaosConvexIndices(false);
+#endif
+
+		int32 numTriangles = convexElem.IndexData.Num() / 3;
+		if (numTriangles == 0)
+		{
+#if AK_USE_PHYSX
+			ConvertConvexMeshToGeometryData(surfIdx, convexElem, &GeometryData);
+#endif
+			continue;
+		}
+
+		int32 vertexOffset = GeometryData.Vertices.Num();
+		for (int32 vertIdx = 0; vertIdx < numVertices; ++vertIdx)
+		{
+			GeometryData.Vertices.Add(convexElem.GetTransform().TransformPosition(convexElem.VertexData[vertIdx]));
+		}
+		for (int32 triIdx = 0; triIdx < numTriangles; ++triIdx)
+		{
+			FAkTriangle tri;
+			tri.Point0 = vertexOffset + convexElem.IndexData[3 * triIdx];
+			tri.Point1 = vertexOffset + convexElem.IndexData[3 * triIdx + 1];
+			tri.Point2 = vertexOffset + convexElem.IndexData[3 * triIdx + 2];
+			tri.Surface = surfIdx;
+
+			GeometryData.Triangles.Add(tri);
 		}
 	}
-	
 }
 
 void UAkGeometryComponent::SendGeometry()
@@ -1187,7 +1094,7 @@ void UAkGeometryComponent::GetTexturesAndSurfaceAreas(TArray<FAkAcousticTextureP
 		{
 			if (CollisionMeshSurfaceOverride.AcousticTexture != nullptr)
 			{
-				const FAkAcousticTextureParams* params = AkSettings->GetTextureParams(CollisionMeshSurfaceOverride.AcousticTexture->AcousticTextureCookedData.ShortId);
+				const FAkAcousticTextureParams* params = AkSettings->GetTextureParams(CollisionMeshSurfaceOverride.AcousticTexture->GetShortID());
 				if (params != nullptr)
 				{
 					textures.Add(*params);
@@ -1208,7 +1115,7 @@ void UAkGeometryComponent::GetTexturesAndSurfaceAreas(TArray<FAkAcousticTextureP
 					surfaceAreas.Add(surfaceArea);
 					if (surface.AcousticTexture != nullptr)
 					{
-						const FAkAcousticTextureParams* params = AkSettings->GetTextureParams(surface.AcousticTexture->AcousticTextureCookedData.ShortId);
+						const FAkAcousticTextureParams* params = AkSettings->GetTextureParams(surface.AcousticTexture->GetShortID());
 						if (params != nullptr)
 						{
 							textures.Add(*params);
@@ -1251,7 +1158,7 @@ bool UAkGeometryComponent::ContainsTexture(const FGuid& textureID)
 	if (MeshType == AkMeshType::CollisionMesh)
 	{
 		if (CollisionMeshSurfaceOverride.AcousticTexture != nullptr)
-			return CollisionMeshSurfaceOverride.AcousticTexture->AcousticTextureInfo.AssetGuid == textureID;
+			return CollisionMeshSurfaceOverride.AcousticTexture->AcousticTextureInfo.WwiseGuid == textureID;
 	}
 	else
 	{
@@ -1259,7 +1166,7 @@ bool UAkGeometryComponent::ContainsTexture(const FGuid& textureID)
 		{
 			if (it.Value().AcousticTexture != nullptr)
 			{
-				if (it.Value().AcousticTexture->AcousticTextureInfo.AssetGuid == textureID)
+				if (it.Value().AcousticTexture->AcousticTextureInfo.WwiseGuid == textureID)
 					return true;
 			}
 		}
@@ -1272,7 +1179,7 @@ void UAkGeometryComponent::RegisterAllTextureParamCallbacks()
 	if (MeshType == AkMeshType::CollisionMesh)
 	{
 		if (CollisionMeshSurfaceOverride.AcousticTexture != nullptr)
-			RegisterTextureParamChangeCallback(CollisionMeshSurfaceOverride.AcousticTexture->AcousticTextureInfo.AssetGuid);
+			RegisterTextureParamChangeCallback(CollisionMeshSurfaceOverride.AcousticTexture->AcousticTextureInfo.WwiseGuid);
 	}
 	else
 	{
@@ -1280,7 +1187,7 @@ void UAkGeometryComponent::RegisterAllTextureParamCallbacks()
 		{
 			if (it.Value().AcousticTexture != nullptr)
 			{
-				RegisterTextureParamChangeCallback(it.Value().AcousticTexture->AcousticTextureInfo.AssetGuid);
+				RegisterTextureParamChangeCallback(it.Value().AcousticTexture->AcousticTextureInfo.WwiseGuid);
 			}
 		}
 	}

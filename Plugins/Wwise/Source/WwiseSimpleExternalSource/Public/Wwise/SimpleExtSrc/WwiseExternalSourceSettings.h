@@ -1,15 +1,17 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
 Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
@@ -33,11 +35,11 @@ class WWISESIMPLEEXTERNALSOURCE_API UWwiseExternalSourceSettings : public UObjec
 public:
 	//Table of all relevant information to properly load all external source media in the project
 	//All files in this table will be packaged in the built project
-	UPROPERTY(config, EditAnywhere, Category = ExternalSources, meta = (AllowedClasses = "DataTable"))
+	UPROPERTY(config, EditAnywhere, Category = ExternalSources, meta = (AllowedClasses = "/Script/Engine.DataTable"))
 	FSoftObjectPath MediaInfoTable;
 
 	//Optional table to define a default media entry in the MediaInfoTable to load when an External Source is loaded
-	UPROPERTY(config, EditAnywhere, Category = ExternalSources, meta = (AllowedClasses = "DataTable"))
+	UPROPERTY(config, EditAnywhere, Category = ExternalSources, meta = (AllowedClasses = "/Script/Engine.DataTable"))
 	FSoftObjectPath ExternalSourceDefaultMedia;
 
 	//Staging location for External Source Media when cooking the project
@@ -56,16 +58,6 @@ public:
 		UE_LOG(LogWwiseSimpleExtSrc, Error, 
 			TEXT("UWwiseExternalSourceSettings::GetExternalSourceStagingDirectory : Could not get staging directory from external source settings"));
 		return {};
-	}
-
-
-	virtual void PostInitProperties() override
-	{
-		Super::PostInitProperties();
-#if WITH_EDITOR
-		AkUnrealEditorHelper::SaveConfigFile(this);
-#endif
-
 	}
 
 #if WITH_EDITOR

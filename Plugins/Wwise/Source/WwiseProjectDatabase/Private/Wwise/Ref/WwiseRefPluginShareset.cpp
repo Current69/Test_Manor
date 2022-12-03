@@ -1,19 +1,21 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
 Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
-#include "Wwise/Ref/WwiseRefPluginShareset.h"
+#include "Wwise/Ref/WwiseRefPluginShareSet.h"
 #include "Wwise/WwiseProjectDatabaseModule.h"
 
 #include "Wwise/Metadata/WwiseMetadataPlugin.h"
@@ -21,9 +23,9 @@ Copyright (c) 2022 Audiokinetic Inc.
 #include "Wwise/Metadata/WwiseMetadataSoundBank.h"
 #include "Wwise/Stats/ProjectDatabase.h"
 
-const TCHAR* const FWwiseRefPluginShareset::NAME = TEXT("PluginShareset");
+const TCHAR* const FWwiseRefPluginShareSet::NAME = TEXT("PluginShareSet");
 
-const FWwiseMetadataPlugin* FWwiseRefPluginShareset::GetPlugin() const
+const FWwiseMetadataPlugin* FWwiseRefPluginShareSet::GetPlugin() const
 {
 	const auto* SoundBank = GetSoundBank();
 	if (UNLIKELY(!SoundBank || !SoundBank->Plugins))
@@ -31,61 +33,61 @@ const FWwiseMetadataPlugin* FWwiseRefPluginShareset::GetPlugin() const
 		return nullptr;
 	}
 
-	const auto& Plugins = SoundBank->Plugins->Sharesets;
-	if (Plugins.IsValidIndex(PluginSharesetIndex))
+	const auto& Plugins = SoundBank->Plugins->ShareSets;
+	if (Plugins.IsValidIndex(PluginShareSetIndex))
 	{
-		return &Plugins[PluginSharesetIndex];
+		return &Plugins[PluginShareSetIndex];
 	}
 	else
 	{
-		UE_LOG(LogWwiseProjectDatabase, Error, TEXT("Could not get Plugin Shareset index #%zu"), PluginSharesetIndex);
+		UE_LOG(LogWwiseProjectDatabase, Error, TEXT("Could not get Plugin ShareSet index #%zu"), PluginShareSetIndex);
 		return nullptr;
 	}
 }
 
-uint32 FWwiseRefPluginShareset::PluginSharesetId() const
+uint32 FWwiseRefPluginShareSet::PluginShareSetId() const
 {
-	const auto* PluginShareset = GetPlugin();
-	if (UNLIKELY(!PluginShareset))
+	const auto* PluginShareSet = GetPlugin();
+	if (UNLIKELY(!PluginShareSet))
 	{
 		return 0;
 	}
-	return PluginShareset->Id;
+	return PluginShareSet->Id;
 }
 
-FGuid FWwiseRefPluginShareset::PluginSharesetGuid() const
+FGuid FWwiseRefPluginShareSet::PluginShareSetGuid() const
 {
-	const auto* PluginShareset = GetPlugin();
-	if (UNLIKELY(!PluginShareset))
+	const auto* PluginShareSet = GetPlugin();
+	if (UNLIKELY(!PluginShareSet))
 	{
 		return {};
 	}
-	return PluginShareset->GUID;
+	return PluginShareSet->GUID;
 }
 
-FString FWwiseRefPluginShareset::PluginSharesetName() const
+FName FWwiseRefPluginShareSet::PluginShareSetName() const
 {
-	const auto* PluginShareset = GetPlugin();
-	if (UNLIKELY(!PluginShareset))
+	const auto* PluginShareSet = GetPlugin();
+	if (UNLIKELY(!PluginShareSet))
 	{
 		return {};
 	}
-	return PluginShareset->Name;
+	return PluginShareSet->Name;
 }
 
-FString FWwiseRefPluginShareset::PluginSharesetObjectPath() const
+FName FWwiseRefPluginShareSet::PluginShareSetObjectPath() const
 {
-	const auto* PluginShareset = GetPlugin();
-	if (UNLIKELY(!PluginShareset))
+	const auto* PluginShareSet = GetPlugin();
+	if (UNLIKELY(!PluginShareSet))
 	{
 		return {};
 	}
-	return PluginShareset->ObjectPath;
+	return PluginShareSet->ObjectPath;
 }
 
-uint32 FWwiseRefPluginShareset::Hash() const
+uint32 FWwiseRefPluginShareSet::Hash() const
 {
 	auto Result = FWwiseRefSoundBank::Hash();
-	Result = HashCombine(Result, ::GetTypeHash(PluginSharesetIndex));
+	Result = HashCombine(Result, ::GetTypeHash(PluginShareSetIndex));
 	return Result;
 }

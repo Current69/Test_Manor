@@ -1,16 +1,18 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
-Copyright (c) 2021 Audiokinetic Inc.
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
+Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
 #include "AkInitBank.h"
@@ -26,19 +28,19 @@ Copyright (c) 2021 Audiokinetic Inc.
 void UAkInitBank::CookAdditionalFilesOverride(const TCHAR* PackageFilename, const ITargetPlatform* TargetPlatform,
                                               TFunctionRef<void(const TCHAR* Filename, void* Data, int64 Size)> WriteAdditionalFile)
 {
-	auto* ResourceCooker = UWwiseResourceCooker::GetForPlatform(TargetPlatform);
-	if (UNLIKELY(!ResourceCooker))
+	auto* ResourceCooker = FWwiseResourceCooker::GetForPlatform(TargetPlatform);
+	if (!ResourceCooker)
 	{
 		return;
 	}
 	ResourceCooker->SetSandboxRootPath(PackageFilename);
-	ResourceCooker->CookInitBank(FWwiseAssetInfo::DefaultInitBank, WriteAdditionalFile);
+	ResourceCooker->CookInitBank(FWwiseObjectInfo::DefaultInitBank, WriteAdditionalFile);
 }
 
 void UAkInitBank::BeginCacheForCookedPlatformData(const ITargetPlatform* TargetPlatform)
 {
-	auto PlatformID = UAkPlatformInfo::GetSharedPlatformInfo(TargetPlatform->PlatformName());
-	UWwiseResourceCooker::CreateForPlatform(TargetPlatform, PlatformID, EWwiseExportDebugNameRule::Name);
+	auto PlatformID = UAkPlatformInfo::GetSharedPlatformInfo(TargetPlatform->IniPlatformName());
+	FWwiseResourceCooker::CreateForPlatform(TargetPlatform, PlatformID, EWwiseExportDebugNameRule::Name);
 }
 #endif
 
@@ -52,34 +54,40 @@ void UAkInitBank::Serialize(FArchive& Ar)
 {
 	Super::Serialize(Ar);
 
-#if WITH_EDITORONLY_DATA
-	auto* ResourceCooker = UWwiseResourceCooker::GetForArchive(Ar);
-	if (UNLIKELY(!ResourceCooker))
+	if (HasAnyFlags(RF_ClassDefaultObject))
 	{
 		return;
 	}
-	FWwiseInitBankCookedData CookedDataToArchive;
-	if (ResourceCooker->PrepareCookedData(CookedDataToArchive, FWwiseAssetInfo::DefaultInitBank))
+
+ #if !UE_SERVER
+ #if WITH_EDITORONLY_DATA
+ 	if (Ar.IsCooking() && Ar.IsSaving())
 	{
+		FWwiseInitBankCookedData CookedDataToArchive;
+		if (auto* ResourceCooker = FWwiseResourceCooker::GetForArchive(Ar))
+		{
+			ResourceCooker->PrepareCookedData(CookedDataToArchive, FWwiseObjectInfo::DefaultInitBank);
+		}
 		CookedDataToArchive.Serialize(Ar);
 	}
-#else
-	InitBankCookedData.Serialize(Ar);
-#endif
+ #else
+ 	InitBankCookedData.Serialize(Ar);
+ #endif
+ #endif
 }
 
 void UAkInitBank::UnloadInitBank()
 {
-	if (LoadedInitBank )
+	if (LoadedInitBank)
 	{
-		auto* ResourceLoader = UWwiseResourceLoader::Get();
+		auto* ResourceLoader = FWwiseResourceLoader::Get();
 		if (UNLIKELY(!ResourceLoader))
 		{
 			return;
 		}
 
-		ResourceLoader->UnloadInitBank(LoadedInitBank);
-		LoadedInitBank=nullptr;
+		ResourceLoader->UnloadInitBank(MoveTemp(LoadedInitBank));
+		LoadedInitBank = nullptr;
 	}
 }
 
@@ -90,12 +98,12 @@ void UAkInitBank::PrepareCookedData()
 	{
 		return;
 	}
-	auto* ResourceCooker = UWwiseResourceCooker::GetDefault();
+	auto* ResourceCooker = FWwiseResourceCooker::GetDefault();
 	if (UNLIKELY(!ResourceCooker))
 	{
 		return;
 	}
-	if (UNLIKELY(!ResourceCooker->PrepareCookedData(InitBankCookedData, FWwiseAssetInfo::DefaultInitBank)))
+	if (UNLIKELY(!ResourceCooker->PrepareCookedData(InitBankCookedData, FWwiseObjectInfo::DefaultInitBank)))
 	{
 		return;
 	}
@@ -112,14 +120,14 @@ TArray<FWwiseLanguageCookedData> UAkInitBank::GetLanguages()
 }
 
 
-void UAkInitBank::LoadInitBank(bool bReload)
+void UAkInitBank::LoadInitBank()
 {
-	auto* ResourceLoader = UWwiseResourceLoader::Get();
+	auto* ResourceLoader = FWwiseResourceLoader::Get();
 	if (UNLIKELY(!ResourceLoader))
 	{
 		return;
 	}
-	if (bReload)
+	if (LoadedInitBank)
 	{
 		UnloadInitBank();
 	}
@@ -131,13 +139,13 @@ void UAkInitBank::LoadInitBank(bool bReload)
 
 
 #if WITH_EDITORONLY_DATA
-void UAkInitBank::MigrateIds()
+void UAkInitBank::MigrateWwiseObjectInfo()
 {
 	//Do nothing because the DefaultInitBank info is used
 }
 
-FWwiseBasicInfo* UAkInitBank::GetInfoMutable()
+FWwiseObjectInfo* UAkInitBank::GetInfoMutable()
 {
-	return new FWwiseBasicInfo(FWwiseAssetInfo::DefaultInitBank.AssetGuid, FWwiseAssetInfo::DefaultInitBank.AssetShortId, FWwiseAssetInfo::DefaultInitBank.AssetName);
+	return new FWwiseObjectInfo(FWwiseObjectInfo::DefaultInitBank.WwiseGuid, FWwiseObjectInfo::DefaultInitBank.WwiseShortId, FWwiseObjectInfo::DefaultInitBank.WwiseName);
 }
 #endif

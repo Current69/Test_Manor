@@ -1,15 +1,17 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
 Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
@@ -18,14 +20,14 @@ Copyright (c) 2022 Audiokinetic Inc.
 #include "HAL/Event.h"
 
 FWwiseExecutionQueue::FWwiseExecutionQueue(ENamedThreads::Type InThread) :
+	Thread(InThread),
 	WorkerState(EWorkerState::Stopped),
-	OpQueue(),
-	Thread(InThread)
+	OpQueue()
 {}
 
 FWwiseExecutionQueue::~FWwiseExecutionQueue()
 {
-	Stop();
+	Close();
 }
 
 bool FWwiseExecutionQueue::Async(FBasicFunction&& InFunction)
@@ -34,8 +36,7 @@ bool FWwiseExecutionQueue::Async(FBasicFunction&& InFunction)
 	{
 		return false;
 	}
-	StartWorkerIfNeeded();
-	return true;
+	return StartWorkerIfNeeded();
 }
 
 bool FWwiseExecutionQueue::AsyncWait(FBasicFunction&& InFunction)
@@ -81,19 +82,41 @@ bool FWwiseExecutionQueue::AsyncWithCallback(FResultCallback&& InCallback, FResu
 	});
 }
 
-void FWwiseExecutionQueue::Stop()
+void FWwiseExecutionQueue::Close()
 {
-	if (WorkerState.Load() == EWorkerState::Running)
+	if (!TrySetStoppedWorkerToClosed())
 	{
-		AsyncWait([this]
+		for (auto State = WorkerState.Load(EMemoryOrder::Relaxed);
+			State != EWorkerState::Closed;
+			State = WorkerState.Load(EMemoryOrder::Relaxed))
 		{
-			WorkerState.Store(EWorkerState::Exiting);
-		});
-		while (WorkerState.Load(EMemoryOrder::Relaxed) != EWorkerState::Stopped) {}
+			if (State != EWorkerState::Closing)
+			{
+				AsyncWait([this]
+				{
+					if (OpQueue.IsEmpty())
+					{
+						TrySetRunningWorkerToClosing();
+					}
+				});
+			}
+		}
 	}
 }
 
-void FWwiseExecutionQueue::StartWorkerIfNeeded()
+bool FWwiseExecutionQueue::IsBeingClosed() const
+{
+	const auto State = WorkerState.Load(EMemoryOrder::Relaxed);
+	return UNLIKELY(State == EWorkerState::Closed || State == EWorkerState::Closing);
+}
+
+bool FWwiseExecutionQueue::IsClosed() const
+{
+	const auto State = WorkerState.Load(EMemoryOrder::Relaxed);
+	return State == EWorkerState::Closed;
+}
+
+bool FWwiseExecutionQueue::StartWorkerIfNeeded()
 {
 	if (TrySetStoppedWorkerToRunning())
 	{
@@ -101,6 +124,15 @@ void FWwiseExecutionQueue::StartWorkerIfNeeded()
 		{
 			Work();
 		});
+		return true;
+	}
+	else if (UNLIKELY(IsBeingClosed()))
+	{
+		return false;
+	}
+	else
+	{
+		return true;
 	}
 }
 
@@ -109,7 +141,6 @@ void FWwiseExecutionQueue::Work()
 	do
 	{
 		ProcessWork();
-		
 	}
 	while (!StopWorkerIfDone());
 }
@@ -118,7 +149,7 @@ bool FWwiseExecutionQueue::StopWorkerIfDone()
 {
 	if (OpQueue.IsEmpty())
 	{
-		if (TrySetRunningWorkerToStopped())
+		if (LIKELY(TrySetRunningWorkerToStopped()))
 		{
 			// If we have a new operation in the queue, we might have to start again
 			if (!OpQueue.IsEmpty()
@@ -134,7 +165,7 @@ bool FWwiseExecutionQueue::StopWorkerIfDone()
 				return true;
 			}
 		}
-		else if (TrySetExitingWorkerToStopped())
+		else if (LIKELY(TrySetClosingWorkerToClosed()))
 		{
 			// We were exiting and we don't have operations anymore. Immediately return, as our worker is not valid at this point.
 			// Don't do any operations here!
@@ -165,16 +196,28 @@ bool FWwiseExecutionQueue::TrySetStoppedWorkerToRunning()
 
 }
 
+bool FWwiseExecutionQueue::TrySetStoppedWorkerToClosed()
+{
+	EWorkerState ThreadStopped = EWorkerState::Stopped;
+	return WorkerState.CompareExchange(ThreadStopped, EWorkerState::Closed);
+}
+
 bool FWwiseExecutionQueue::TrySetRunningWorkerToStopped()
 {
 	EWorkerState ThreadRunning = EWorkerState::Running;
 	return WorkerState.CompareExchange(ThreadRunning, EWorkerState::Stopped);
+}
+
+bool FWwiseExecutionQueue::TrySetRunningWorkerToClosing()
+{
+	EWorkerState ThreadRunning = EWorkerState::Running;
+	return WorkerState.CompareExchange(ThreadRunning, EWorkerState::Closing);
 	// Warning: Try not to do operations past this method returning "true". There's a slight chance "this" might be deleted!
 }
 
-bool FWwiseExecutionQueue::TrySetExitingWorkerToStopped()
+bool FWwiseExecutionQueue::TrySetClosingWorkerToClosed()
 {
-	EWorkerState ThreadExiting = EWorkerState::Exiting;
-	return WorkerState.CompareExchange(ThreadExiting, EWorkerState::Stopped);
+	EWorkerState ThreadClosing = EWorkerState::Closing;
+	return WorkerState.CompareExchange(ThreadClosing, EWorkerState::Closed);
 	// Warning: NEVER do operations past this method returning "true". "this" is probably deleted!
 }

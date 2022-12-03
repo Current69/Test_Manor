@@ -1,15 +1,17 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
 Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
@@ -20,12 +22,12 @@ Copyright (c) 2022 Audiokinetic Inc.
 
 #include "CoreMinimal.h"
 
-using WwiseLanguageNamesMap = TMap<FString, FWwiseRefLanguage>;
+using WwiseLanguageNamesMap = TMap<FName, FWwiseRefLanguage>;
 using WwiseLanguageIdsMap = TMap<uint32, FWwiseRefLanguage>;
-using WwisePlatformNamesMap = TMap<FString, FWwiseRefPlatform>;
+using WwisePlatformNamesMap = TMap<FName, FWwiseRefPlatform>;
 using WwisePlatformGuidsMap = TMap<FGuid, FWwiseRefPlatform>;
 using WwiseMediaIdsMap = TMap<uint32, FWwiseRefMedia>;
-using WwisePluginLibNamesMap = TMap<FString, FWwiseRefPluginLib>;
+using WwisePluginLibNamesMap = TMap<FName, FWwiseRefPluginLib>;
 using WwisePluginLibIdsMap = TMap<uint32, FWwiseRefPluginLib>;
 using WwiseSoundBankIdsMap = TMap<uint32, FWwiseRefSoundBank>;
 using WwiseDialogueEventIdsMap = TMap<uint32, FWwiseRefDialogueEvent>;
@@ -33,7 +35,7 @@ using WwiseDialogueArgumentIdsMap = TMap<uint32, FWwiseRefDialogueArgument>;
 using WwiseBusIdsMap = TMap<uint32, FWwiseRefBus>;
 using WwiseAuxBusIdsMap = TMap<uint32, FWwiseRefAuxBus>;
 using WwiseCustomPluginIdsMap = TMap<uint32, FWwiseRefCustomPlugin>;
-using WwisePluginSharesetIdsMap = TMap<uint32, FWwiseRefPluginShareset>;
+using WwisePluginShareSetIdsMap = TMap<uint32, FWwiseRefPluginShareSet>;
 using WwiseAudioDeviceIdsMap = TMap<uint32, FWwiseRefAudioDevice>;
 using WwiseEventIdsMap = TMap<uint32, FWwiseRefEvent>;
 using WwiseExternalSourceIdsMap = TMap<uint32, FWwiseRefExternalSource>;
@@ -53,10 +55,10 @@ using WwiseDialogueArgumentGlobalIdsMap = TMap<FWwiseDatabaseLocalizableIdKey, F
 using WwiseBusGlobalIdsMap = TMap<FWwiseDatabaseLocalizableIdKey, FWwiseRefBus>;
 using WwiseAuxBusGlobalIdsMap = TMap<FWwiseDatabaseLocalizableIdKey, FWwiseRefAuxBus>;
 using WwiseCustomPluginGlobalIdsMap = TMap<FWwiseDatabaseLocalizableIdKey, FWwiseRefCustomPlugin>;
-using WwisePluginSharesetGlobalIdsMap = TMap<FWwiseDatabaseLocalizableIdKey, FWwiseRefPluginShareset>;
+using WwisePluginShareSetGlobalIdsMap = TMap<FWwiseDatabaseLocalizableIdKey, FWwiseRefPluginShareSet>;
 using WwisePluginLibGlobalIdsMap = TMap<FWwiseDatabaseLocalizableIdKey, FWwiseRefPluginLib>;
 using WwiseAudioDeviceGlobalIdsMap = TMap<FWwiseDatabaseLocalizableIdKey, FWwiseRefAudioDevice>;
-using WwiseEventGlobalIdsMap = TMap<FWwiseDatabaseEventIdKey, FWwiseRefEvent>;
+using WwiseEventGlobalIdsMap = TMap<FWwiseDatabaseLocalizableIdKey, FWwiseRefEvent>;
 using WwiseExternalSourceGlobalIdsMap = TMap<FWwiseDatabaseLocalizableIdKey, FWwiseRefExternalSource>;
 using WwiseAcousticTextureGlobalIdsMap = TMap<FWwiseDatabaseLocalizableIdKey, FWwiseRefAcousticTexture>;
 using WwiseGameParameterGlobalIdsMap = TMap<FWwiseDatabaseLocalizableIdKey, FWwiseRefGameParameter>;

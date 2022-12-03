@@ -73,8 +73,9 @@ namespace AK
 		};
 
 #ifdef AK_IMPLEMENT_PROFILINGID_NAMES
-		const char* s_aszNames[AK::ProfilingID::Num] =
+		const char* s_aszNames[] =
 		{
+			"AK INVALID PROFILEID", // should never be used; 0 means no relevant profile id was provided
 			"AK Audio Frame Boundary",
 			"AK Audio Voice Starvation",
 			"CAkLEngine::AnalyzeMixingGraph",
@@ -82,19 +83,19 @@ namespace AK
 			"CAkLEngine::VoiceTask",
 			"CAkLEngine::VoiceTaskParallelAsync",
 			"AkPerf::PostPipelineStats",
-			"CommunicationCentral::Process",
-			"JobMgr::WorkerFunction",
-			"SwVoice",
-			"HwVoice",
-			"SpatialAudio::Update",
-			"SpatialAudio::Dispatch",
-			"SpatialAudio::End",
-			"SpatialAudio::EmitterToListener",
-			"SpatialAudio::ListenerRayCasting",
-			"SpatialAudio::ListenerToPortal",
-			"SpatialAudio::EmitterToPortal",
-			"SpatialAudio::PortalToPortal",
-			"SpatialAudio::PortalRayCasting",
+			"AK::CommunicationCentral::Process",
+			"AkJobMgr::WorkerFunction",
+			"AK SwVoice",
+			"AK HwVoice",
+			"AK::SpatialAudio::Update",
+			"AK::SpatialAudio::Dispatch",
+			"AK::SpatialAudio::End",
+			"AK::SpatialAudio::EmitterToListener",
+			"AK::SpatialAudio::ListenerRayCasting",
+			"AK::SpatialAudio::ListenerToPortal",
+			"AK::SpatialAudio::EmitterToPortal",
+			"AK::SpatialAudio::PortalToPortal",
+			"AK::SpatialAudio::PortalRayCasting",
 			"CAkEdgePathSearch::Search",
 			"CAkStochasticReflectionEngine::ComputeRays",
 			"CAkStochasticReflectionEngine::TraceDiffractionRay",
@@ -102,8 +103,8 @@ namespace AK
 			"CAkStochasticReflectionEngine::ValidateExistingPaths",
 			"CAkStochasticReflectionEngine::ValidatePaths",
 			"AkAcousticRoom::PropagateSound",
-			"AkSoundGeometry::SetGeometry"
-
+			"AkSoundGeometry::SetGeometry",
+			"AkSoundGeometry::SetGeometryInstance"
 		};
 
 		static_assert((sizeof(s_aszNames) / sizeof(s_aszNames[0])) == AK::ProfilingID::Num, "ARRAYSIZE(AK::ProfilingID::s_aszNames) is not matching AK::ProfilingID::Num, make sure they are maintained at the same time.");

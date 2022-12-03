@@ -1,16 +1,18 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
-Copyright (c) 2021 Audiokinetic Inc.
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
+Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
 #include "StaticPluginWriter.h"
@@ -148,13 +150,13 @@ namespace StaticPluginWriter_Helper
 	TArray<FString> GetLibraryNames(const FString& Platform)
 	{
 		TArray<FString> result;
-		UWwiseProjectDatabase* ProjectDatabase = UWwiseProjectDatabase::Get();
+		FWwiseProjectDatabase* ProjectDatabase = FWwiseProjectDatabase::Get();
 		const FWwiseDataStructureScopeLock DataStructure(*ProjectDatabase);
 
 		WwisePluginLibGlobalIdsMap PluginLibs = DataStructure.GetPluginLibs();
 		for (const auto& PluginLib: PluginLibs)
 		{
-			FString PluginLibName = PluginLib.Value.PluginLibName();
+			FString PluginLibName = PluginLib.Value.PluginLibName().ToString();
 			result.Add(PluginLibName);
 		}
 
@@ -208,7 +210,7 @@ namespace StaticPluginWriter
 			const auto PluginArray = StaticPluginWriter_Helper::GetLibraryNames( Platform);
 
 			const FString AkPluginIncludeFileName = FString::Format(TEXT("Ak{0}Plugins.h"), { PlatformInfo->WwisePlatform });
-			const FString AkPluginIncludeFilePath = FPaths::Combine(FAkPlatform::GetWwisePluginDirectory(), TEXT("Source"), TEXT("WwiseSoundEngine"), TEXT("Private"), TEXT("Generated"), AkPluginIncludeFileName);
+			const FString AkPluginIncludeFilePath = FPaths::Combine(FAkPlatform::GetWwisePluginDirectory(), TEXT("Source"), TEXT("WwiseSoundEngine_") TEXT(AK_WWISE_SOUNDENGINE_VERSION), TEXT("Private"), TEXT("Generated"), AkPluginIncludeFileName);
 
 			StaticPluginWriter_Helper::ModifySourceCode(*AkPluginIncludeFilePath, PlatformInfo->WwisePlatform, PluginArray);
 		}

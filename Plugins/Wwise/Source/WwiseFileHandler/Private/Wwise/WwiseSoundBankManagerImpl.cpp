@@ -1,31 +1,33 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
 Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
 #include "Wwise/WwiseSoundBankManagerImpl.h"
 #include "Wwise/WwiseSoundBankFileState.h"
 
-UWwiseSoundBankManagerImpl::UWwiseSoundBankManagerImpl() :
+FWwiseSoundBankManagerImpl::FWwiseSoundBankManagerImpl() :
 	StreamingGranularity(0)
 {
 }
 
-UWwiseSoundBankManagerImpl::~UWwiseSoundBankManagerImpl()
+FWwiseSoundBankManagerImpl::~FWwiseSoundBankManagerImpl()
 {
 }
 
-void UWwiseSoundBankManagerImpl::LoadSoundBank(const FWwiseSoundBankCookedData& InSoundBankCookedData, const FString& InRootPath, FLoadSoundBankCallback&& InCallback)
+void FWwiseSoundBankManagerImpl::LoadSoundBank(const FWwiseSoundBankCookedData& InSoundBankCookedData, const FString& InRootPath, FLoadSoundBankCallback&& InCallback)
 {
 	IncrementFileStateUseAsync(InSoundBankCookedData.SoundBankId, EWwiseFileStateOperationOrigin::Loading, [this, InSoundBankCookedData, InRootPath]() mutable
 	{
@@ -36,17 +38,17 @@ void UWwiseSoundBankManagerImpl::LoadSoundBank(const FWwiseSoundBankCookedData& 
 	});
 }
 
-void UWwiseSoundBankManagerImpl::UnloadSoundBank(const FWwiseSoundBankCookedData& InSoundBankCookedData, const FString& InRootPath, FUnloadSoundBankCallback&& InCallback)
+void FWwiseSoundBankManagerImpl::UnloadSoundBank(const FWwiseSoundBankCookedData& InSoundBankCookedData, const FString& InRootPath, FUnloadSoundBankCallback&& InCallback)
 {
 	DecrementFileStateUseAsync(InSoundBankCookedData.SoundBankId, nullptr, EWwiseFileStateOperationOrigin::Loading, MoveTemp(InCallback));
 }
 
-void UWwiseSoundBankManagerImpl::SetGranularity(AkUInt32 InStreamingGranularity)
+void FWwiseSoundBankManagerImpl::SetGranularity(AkUInt32 InStreamingGranularity)
 {
 	StreamingGranularity = InStreamingGranularity;
 }
 
-FWwiseFileStateSharedPtr UWwiseSoundBankManagerImpl::CreateOp(const FWwiseSoundBankCookedData& InSoundBankCookedData, const FString& InRootPath)
+FWwiseFileStateSharedPtr FWwiseSoundBankManagerImpl::CreateOp(const FWwiseSoundBankCookedData& InSoundBankCookedData, const FString& InRootPath)
 {
 	return FWwiseFileStateSharedPtr(new FWwiseInMemorySoundBankFileState(InSoundBankCookedData, InRootPath));
 }

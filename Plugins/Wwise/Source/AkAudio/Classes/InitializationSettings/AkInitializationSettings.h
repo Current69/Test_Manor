@@ -1,16 +1,18 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
-Copyright (c) 2021 Audiokinetic Inc.
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
+Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
 #pragma once
@@ -116,8 +118,8 @@ struct FAkMainOutputSettings
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, Category="Ak Initialization Settings|Main Output Settings", meta = (ToolTip = "The name of a custom audio device to be used. Custom audio devices are defined in the Audio Device Shareset section of the Wwise project. Leave this empty to output normally through the default audio device."))
-	FString AudioDeviceShareset;
+	UPROPERTY(EditAnywhere, Category="Ak Initialization Settings|Main Output Settings", meta = (ToolTip = "The name of a custom audio device to be used. Custom audio devices are defined in the Audio Device ShareSet section of the Wwise project. Leave this empty to output normally through the default audio device."))
+	FString AudioDeviceShareSet;
 
 	UPROPERTY(EditAnywhere, Category = "Ak Initialization Settings|Main Output Settings", meta = (ToolTip = "Device specific identifier, when multiple devices of the same type are possible. If only one device is possible, leave to 0."))
 	uint32 DeviceID = AK_INVALID_UNIQUE_ID;
@@ -128,7 +130,7 @@ struct FAkMainOutputSettings
 	UPROPERTY(EditAnywhere, Category = "Ak Initialization Settings|Main Output Settings", meta = (ToolTip = "A code that completes the identification of channels by uChannelMask. Anonymous: Channel mask == 0 and channels; Standard: Channels must be identified with standard defines in AkSpeakerConfigs; Ambisonic: Channel mask == 0 and channels follow standard ambisonic order."))
 	EAkChannelConfigType ChannelConfigType = EAkChannelConfigType::Anonymous;
 
-	UPROPERTY(EditAnywhere, Category = "Ak Initialization Settings|Main Output Settings", meta = (Bitmask, BitmaskEnum = EAkChannelMask, ToolTip = "A bit field, whose channel identifiers depend on AkChannelConfigType (up to 20)."))
+	UPROPERTY(EditAnywhere, Category = "Ak Initialization Settings|Main Output Settings", meta = (Bitmask, BitmaskEnum = "/Script/AkAudio.EAkChannelMask", ToolTip = "A bit field, whose channel identifiers depend on AkChannelConfigType (up to 20)."))
 	uint32 ChannelMask = 0;
 
 	UPROPERTY(EditAnywhere, Category = "Ak Initialization Settings|Main Output Settings", meta = (ToolTip = "The number of channels, identified (deduced from channel mask) or anonymous (set directly)."))
@@ -318,11 +320,14 @@ struct FAkAdvancedInitializationSettingsWithMultiCoreRendering : public FAkAdvan
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, Category = "Ak Initialization Settings", meta = (ToolTip = "Allow to distribute SoundEngine processing tasks across the Unreal Engine Task Graph. Requires Editor restart."))
+	UPROPERTY(EditAnywhere, Category = "Ak Initialization Settings", meta = (ToolTip = "Enable to run SoundEngine processing tasks on the Unreal Engine worker threads. Requires Editor restart."))
 	bool EnableMultiCoreRendering = true;
 
-	UPROPERTY(EditAnywhere, Category = "Ak Initialization Settings", meta = (EditCondition = "EnableMultiCoreRendering", ToolTip = "Maximum time allotted for Sound Engine processing tasks in microseconds. Requires Editor restart."))
-	uint32 JobWorkerMaxExecutionTimeUSec = 100;
+	UPROPERTY(EditAnywhere, Category = "Ak Initialization Settings", meta = (EditCondition = "EnableMultiCoreRendering", ToolTip = "Configure the maximum number of workers that the Sound Engine will request at any given time. Requires Editor restart."))
+	uint32 MaxNumJobWorkers = 1;
+
+	UPROPERTY(EditAnywhere, Category = "Ak Initialization Settings", meta = (EditCondition = "EnableMultiCoreRendering", ToolTip = "Maximum time allotted for each Sound Engine job in microseconds (0 is unlimited). Requires Editor restart."))
+	uint32 JobWorkerMaxExecutionTimeUSec = 0;
 
 	void FillInitializationStructure(FAkInitializationStructure& InitializationStructure) const;
 };

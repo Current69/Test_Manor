@@ -327,8 +327,6 @@ namespace AK
 			ErrorCode_AmbisonicNotAvailable,
 
 			ErrorCode_NoAudioDevice,
-			ErrorCode_PreConnectionError,
-			ErrorCode_EndPreConnectionError,
 
 			ErrorCode_Support,
 			ErrorCode_ReplayMessage,
@@ -364,7 +362,7 @@ namespace AK
 			Num_ErrorCodes // THIS STAYS AT END OF ENUM
 		};
 
-		static_assert(Num_ErrorCodes == 213,
+		static_assert(Num_ErrorCodes == 211,
 			"Please document your new ErrorCode "
 			"in 'Documentation/Help/source_en/reference/common_errors_capture_log.xml', "
 			"then you can increment this value."

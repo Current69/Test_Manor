@@ -180,7 +180,7 @@ static const AkPriority					AK_DEFAULT_BANK_IO_PRIORITY			= AK_DEFAULT_PRIORITY;
 static const AkReal32					AK_DEFAULT_BANK_THROUGHPUT			= 1*1024*1024/1000.f;	///<  Default bank load throughput (1 Mb/ms)
 
 // Bank version
-static const AkUInt32					AK_SOUNDBANK_VERSION =				144;					///<  Version of the soundbank reader
+static const AkUInt32					AK_SOUNDBANK_VERSION =				145;					///<  Version of the soundbank reader
 
 // Job types
 static const AkJobType                  AkJobType_Generic                   = 0;                    ///< Job type for general-purpose work

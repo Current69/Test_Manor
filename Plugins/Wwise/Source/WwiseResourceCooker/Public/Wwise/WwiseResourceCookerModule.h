@@ -1,15 +1,17 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
 Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
@@ -20,7 +22,7 @@ Copyright (c) 2022 Audiokinetic Inc.
 #include "UObject/Class.h"
 
 struct FWwiseSharedPlatformId;
-class UWwiseResourceCooker;
+class FWwiseResourceCooker;
 
 UENUM()
 enum class EWwiseExportDebugNameRule
@@ -59,7 +61,9 @@ public:
 		{
 			return nullptr;
 		}
-
+#if UE_SERVER
+		return nullptr;
+#else
 		FModuleManager& ModuleManager = FModuleManager::Get();
 		IWwiseResourceCookerModule* Result = ModuleManager.GetModulePtr<IWwiseResourceCookerModule>(ModuleName);
 		if (UNLIKELY(!Result))
@@ -84,14 +88,19 @@ public:
 		}
 
 		return Result;
+#endif
 	}
 
-	virtual UWwiseResourceCooker* GetDefaultCooker()
+	virtual FWwiseResourceCooker* GetResourceCooker()
+	{
+		return nullptr;
+	}
+	virtual FWwiseResourceCooker* InstantiateResourceCooker()
 	{
 		return nullptr;
 	}
 
-	virtual UWwiseResourceCooker* CreateCookerForPlatform(
+	virtual FWwiseResourceCooker* CreateCookerForPlatform(
 		const ITargetPlatform* TargetPlatform,
 		const FWwiseSharedPlatformId& InPlatform,
 		EWwiseExportDebugNameRule InExportDebugNameRule = EWwiseExportDebugNameRule::Release)
@@ -103,12 +112,12 @@ public:
 	{
 	}
 
-	virtual UWwiseResourceCooker* GetCookerForPlatform(const ITargetPlatform* TargetPlatform)
+	virtual FWwiseResourceCooker* GetCookerForPlatform(const ITargetPlatform* TargetPlatform)
 	{
 		return nullptr;
 	}
 
-	UWwiseResourceCooker* GetCookerForArchive(const FArchive& InArchive)
+	FWwiseResourceCooker* GetCookerForArchive(const FArchive& InArchive)
 	{
 		if (!InArchive.IsCooking() || !InArchive.IsSaving())
 		{
@@ -136,24 +145,4 @@ private:
 		GConfig->GetString(TEXT("Audio"), TEXT("WwiseResourceCookerModuleName"), ModuleName, GEngineIni);
 		return FName(ModuleName);
 	}
-};
-
-class WWISERESOURCECOOKER_API FWwiseResourceCookerModuleImpl : public IWwiseResourceCookerModule
-{
-public:
-	UWwiseResourceCooker* GetDefaultCooker() override;
-
-	UWwiseResourceCooker* CreateCookerForPlatform(
-		const ITargetPlatform* TargetPlatform,
-		const FWwiseSharedPlatformId& InPlatform,
-		EWwiseExportDebugNameRule InExportDebugNameRule = EWwiseExportDebugNameRule::Release) override;
-	void DestroyCookerForPlatform(const ITargetPlatform* TargetPlatform) override;
-	UWwiseResourceCooker* GetCookerForPlatform(const ITargetPlatform* TargetPlatform) override;
-
-	void DestroyAllCookerPlatforms() override;
-
-protected:
-	TMap<const ITargetPlatform*, UWwiseResourceCooker*> CookingPlatforms;
-
-	void OnModifyCook(TConstArrayView<const ITargetPlatform*> InTargetPlatforms, TArray<FName>& InOutPackagesToCook, TArray<FName>& InOutPackagesToNeverCook) override;
 };

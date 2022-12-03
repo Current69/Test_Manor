@@ -27,10 +27,6 @@ the specific language governing permissions and limitations under the License.
 #ifndef _AK_AKASSERT_H_
 #define _AK_AKASSERT_H_
 
-#if defined(__EMSCRIPTEN__)
-#include <assert.h>
-#endif
-
 #if defined( _DEBUG ) && !(defined AK_DISABLE_ASSERTS)
 	#ifndef AK_ENABLE_ASSERTS
 		#define AK_ENABLE_ASSERTS
@@ -55,12 +51,8 @@ the specific language governing permissions and limitations under the License.
 	#if defined( AK_ENABLE_ASSERTS )
 		extern AKSOUNDENGINE_API AkAssertHook g_pAssertHook;
 
-		#if defined(__EMSCRIPTEN__)
-		#define AKASSERT(Condition) assert(Condition)
-		#else
 		// These platforms use a built-in g_pAssertHook (and do not fall back to the regular assert macro)
 		#define AKASSERT(Condition) ((Condition) ? ((void) 0) : g_pAssertHook( #Condition, __FILE__, __LINE__) )
-		#endif
 
 		#define AKVERIFY AKASSERT
 

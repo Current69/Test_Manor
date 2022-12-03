@@ -1,15 +1,17 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
 Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
@@ -30,13 +32,13 @@ struct WWISERESOURCELOADER_API FWwisePlatformId
 #endif
 	{}
 
-	FWwisePlatformId(const FGuid& InPlatformGuid, const FString& InPlatformName) :
+	FWwisePlatformId(const FGuid& InPlatformGuid, const FName& InPlatformName) :
 		PlatformGuid(InPlatformGuid),
 		PlatformName(InPlatformName)
 	{}
 
 #if WITH_EDITORONLY_DATA
-	FWwisePlatformId(const FGuid& InPlatformGuid, const FString& InPlatformName, const FString& InGeneratedSoundBanksPath) :
+	FWwisePlatformId(const FGuid& InPlatformGuid, const FName& InPlatformName, const FName& InGeneratedSoundBanksPath) :
 		PlatformGuid(InPlatformGuid),
 		PlatformName(InPlatformName),
 		PathRelativeToGeneratedSoundBanks(InGeneratedSoundBanksPath)
@@ -50,14 +52,14 @@ struct WWISERESOURCELOADER_API FWwisePlatformId
 	 * @brief Optional debug name. Can be empty in release, contain the name, or the full path of the asset.
 	*/
 	UPROPERTY(BlueprintReadOnly, VisibleInstanceOnly, Category = "Wwise")
-		FString PlatformName;
+		FName PlatformName;
 
 #if WITH_EDITORONLY_DATA
 	UPROPERTY(Transient, VisibleInstanceOnly, Category = "Wwise")
-		FString PathRelativeToGeneratedSoundBanks;
+		FName PathRelativeToGeneratedSoundBanks;
 
 	UPROPERTY(Transient, VisibleInstanceOnly, Category = "Wwise")
-		FString ExternalSourceRootPath;
+		FName ExternalSourceRootPath;
 #endif
 
 	bool operator==(const FWwisePlatformId& Rhs) const

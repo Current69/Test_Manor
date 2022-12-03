@@ -1,15 +1,17 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
 Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
@@ -23,6 +25,7 @@ Copyright (c) 2022 Audiokinetic Inc.
 #include "Wwise/Stats/ProjectDatabase.h"
 
 #include "Async/Async.h"
+#include "Misc/Paths.h"
 
 //
 // FPlatformRootDirectoryVisitor
@@ -133,41 +136,41 @@ bool FWwiseDirectoryVisitor::Visit(const TCHAR* FilenameOrDirectory, bool bIsDir
 		{
 			for (auto& Platform : Platforms)
 			{
-				if (PlatformName->Equals(Platform.Name, ESearchCase::IgnoreCase))
+				if (PlatformName->ToString().Equals(Platform.Name.ToString(), ESearchCase::IgnoreCase))
 				{
 					bFoundPlatform = true;
 					break;
 				}
 			}
 
-			UE_CLOG(UNLIKELY(!bFoundPlatform), LogWwiseProjectDatabase, Log, TEXT("Requested platform not found: %s"), **PlatformName);
+			UE_CLOG(UNLIKELY(!bFoundPlatform), LogWwiseProjectDatabase, Log, TEXT("Requested platform not found: %s"), *PlatformName->ToString());
 		}
 
 		if (bFoundPlatform)
 		{
 			for (auto& Platform : Platforms)
 			{
-				const auto PlatformPath = Path / Platform.Path;
+				const auto PlatformPath = Path / Platform.Path.ToString();
 
-				if (!PlatformName->Equals(Platform.Name, ESearchCase::IgnoreCase))
+				if (!PlatformName->ToString().Equals(Platform.Name.ToString(), ESearchCase::IgnoreCase))
 				{
-					UE_LOG(LogWwiseProjectDatabase, Verbose, TEXT("Skipping platform %s"), *Platform.Name);
+					UE_LOG(LogWwiseProjectDatabase, Verbose, TEXT("Skipping platform %s"), *Platform.Name.ToString());
 					continue;
 				}
 				if (PlatformGuid && *PlatformGuid != Platform.BasePlatformGUID)
 				{
-					UE_LOG(LogWwiseProjectDatabase, Verbose, TEXT("Skipping platform %s (Base %s)"), *Platform.Name, *Platform.BasePlatform);
+					UE_LOG(LogWwiseProjectDatabase, Verbose, TEXT("Skipping platform %s (Base %s)"), *Platform.Name.ToString(), *Platform.BasePlatform.ToString());
 					continue;
 				}
 
-				UE_LOG(LogWwiseProjectDatabase, Verbose, TEXT("Visiting platform %s at: %s"), *Platform.Name, *Platform.Path);
+				UE_LOG(LogWwiseProjectDatabase, Verbose, TEXT("Visiting platform %s at: %s"), *Platform.Name.ToString(), *Platform.Path.ToString());
 
 				FWwisePlatformId CurrentPlatform;
 				CurrentPlatform.PlatformGuid = Platform.GUID;
 				CurrentPlatform.PlatformName = Platform.Name;
 				FString RelativePlatformPath(PlatformPath);
 				FPaths::MakePathRelativeTo(RelativePlatformPath, *AkUnrealHelper::GetSoundBankDirectory());
-				CurrentPlatform.PathRelativeToGeneratedSoundBanks = RelativePlatformPath;
+				CurrentPlatform.PathRelativeToGeneratedSoundBanks = FName(RelativePlatformPath);
 				FWwiseSharedPlatformId PlatformRef;
 				PlatformRef.Platform = MakeShared<FWwisePlatformId>(CurrentPlatform);
 
@@ -176,7 +179,7 @@ bool FWwiseDirectoryVisitor::Visit(const TCHAR* FilenameOrDirectory, bool bIsDir
 					if (!FileInterface.IterateDirectory(*PlatformPath, *RootVisitor) ||
 						!RootVisitor->StartJobIfValid())
 					{
-						UE_LOG(LogWwiseProjectDatabase, Warning, TEXT("Could not find generated platform %s at: %s"), *PlatformRef.GetPlatformName(), *PlatformRef.Platform->PathRelativeToGeneratedSoundBanks);
+						UE_LOG(LogWwiseProjectDatabase, Warning, TEXT("Could not find generated platform %s at: %s"), *PlatformRef.GetPlatformName().ToString(), *PlatformRef.Platform->PathRelativeToGeneratedSoundBanks.ToString());
 						delete RootVisitor;
 						RootVisitor = nullptr;
 					}

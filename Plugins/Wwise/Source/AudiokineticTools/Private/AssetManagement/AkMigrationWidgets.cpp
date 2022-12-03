@@ -1,33 +1,43 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
-Copyright (c) 2021 Audiokinetic Inc.
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
+Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
 #include "AkMigrationWidgets.h" 
-#include "AkAssetMigrationHelper.h"
-
-#include "AkWaapiClient.h"
 #include "AkSettingsPerUser.h"
+#include "AkUEFeatures.h"
+#include "AkUnrealEditorHelper.h"
+#include "AkUnrealHelper.h"
+#include "AkWaapiClient.h"
+
+#include "DesktopPlatformModule.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Framework/MultiBox/MultiBoxBuilder.h"
+#include "IDesktopPlatform.h"
+#include "Interfaces/IMainFrameModule.h"
 
 #include "Widgets/Layout/SHeader.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SCheckBox.h"
+#include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Input/SHyperlink.h"
+#include "Widgets/Input/SMultiLineEditableTextBox.h"
 #include "Widgets/Layout/SSpacer.h"
 #include "Widgets/Layout/SExpandableArea.h"
-#include "Framework/Application/SlateApplication.h"
-#include "Framework/MultiBox/MultiBoxBuilder.h"
-#include "AkUnrealEditorHelper.h"
+#include "Widgets/Text/STextBlock.h"
 
 #define LOCTEXT_NAMESPACE "AkAudio"
 
@@ -37,9 +47,9 @@ namespace MigrationDialogUtils
 	{
 		if (Area.IsTitleHovered())
 		{
-			return Area.IsExpanded() ? FEditorStyle::GetBrush("DetailsView.CategoryTop_Hovered") : FEditorStyle::GetBrush("DetailsView.CollapsedCategory_Hovered");
+			return Area.IsExpanded() ? FAkAppStyle::Get().GetBrush("DetailsView.CategoryTop_Hovered") : FAkAppStyle::Get().GetBrush("DetailsView.CollapsedCategory_Hovered");
 		}
-		return Area.IsExpanded() ? FEditorStyle::GetBrush("DetailsView.CategoryTop") : FEditorStyle::GetBrush("DetailsView.CollapsedCategory");
+		return Area.IsExpanded() ? FAkAppStyle::Get().GetBrush("DetailsView.CategoryTop") : FAkAppStyle::Get().GetBrush("DetailsView.CollapsedCategory");
 	}
 }
 
@@ -53,11 +63,15 @@ void SMigrationWidget::Construct(const FArguments& InArgs)
 
 	ChildSlot
 	[
+		SNew(SBox)
+		.MaxDesiredWidth(800)
+		[
 		SNew(SVerticalBox)
 		+ SVerticalBox::Slot()
 		[
+
 			SNew(SBorder)
-			.BorderImage(FEditorStyle::GetBrush("ToolPanel.GroupBorder"))
+			.BorderImage(FAkAppStyle::Get().GetBrush("ToolPanel.GroupBorder"))
 			.Padding(4.0f)
 			[
 				SNew(SVerticalBox)
@@ -72,7 +86,7 @@ void SMigrationWidget::Construct(const FArguments& InArgs)
 					.Text(LOCTEXT("MigrationWelcome",
 						"Migrating to Single Source of Truth\n"
 					))
-					.Font(FEditorStyle::GetFontStyle("StandardDialog.LargeFont"))
+					.Font(FAkAppStyle::Get().GetFontStyle("StandardDialog.LargeFont"))
 				]
 
 				/// Intro text
@@ -82,14 +96,8 @@ void SMigrationWidget::Construct(const FArguments& InArgs)
 				[
 					SNew(STextBlock)
 					.Text(LOCTEXT("MigrationIntroText",
-						"Introduced in Wwise 2022.1, Single Source of Truth is a new way of managing audio assets in your Unreal Project. Major changes are:\n"
-						"- The one and only data source for the Unreal Engine Integration is now the Generated SoundBanks folder. The Wwise project is no longer parsed to gather information; everything is read from the SoundBank JSON metadata files.\n"
-						"- Unreal assets no longer contain binary Wwise SoundBank and Media data.\n"
-						"- Wwise-related Unreal assets can exist anywhere in your project hierarchy; there are no more rigid path requirements.\n"
-						"- The new Auto-Generated SoundBanks feature in Wwise is strongly recommended, and will be enabled by default in Wwise if you were using Event-Based Packaging.\n"
-						"- SoundBanks are now managed from the Wwise SoundBank manager. The event-to-SoundBank relation previously represented in Unreal assets can be imported in Wwise during the migration process.\n"
-						"\n"
-						"We recommend performing all necessary migration steps as soon as possible, in a single operation. Since the migration operation has an impact on Unreal assets, ensure to checkout all Wwise-related assets from Source control.\n"
+						"We recommend performing all necessary migration steps as soon as possible, in a single operation. Since the migration operation has an impact on Unreal assets, ensure to checkout all Wwise-related assets from Source control. "
+						"Migration will also potentially update settings in your Wwise project. It is important to first check-out, open, and migrate the Wwise Project in Wwise Authoring BEFORE pressing 'Continue'.\n"
 					))
 					.AutoWrapText(true)
 				]
@@ -105,8 +113,9 @@ void SMigrationWidget::Construct(const FArguments& InArgs)
 					.AutoWidth()
 					[
 						SNew(SHyperlink)
-						.Text(LOCTEXT("MigrationNotesLink", "For more information about this process, please refer to Wwise 2022.1.0 migration notes."))
+						.Text(LOCTEXT("MigrationNotesLink", "Please refer to Wwise 2022.1 migration notes for more information about the migration process."))
 						.OnNavigate_Lambda([=]{ FPlatformProcess::LaunchURL(TEXT("https://www.audiokinetic.com/library/edge/?source=UE4&id=pg_important_migration_notes_2022_1_0.html"), nullptr, nullptr); })
+
 					]
 					+ SHorizontalBox::Slot()
 					[
@@ -153,7 +162,6 @@ void SMigrationWidget::Construct(const FArguments& InArgs)
 					.Visibility(this, &SMigrationWidget::GetAssetMigrationWidgetVisibility)
 				]
 
-
 				// Migrating Wwise Project options
 				+ SVerticalBox::Slot()
 				.Padding(0, 5)
@@ -162,7 +170,6 @@ void SMigrationWidget::Construct(const FArguments& InArgs)
 					SAssignNew(ProjectMigrationWidget, SProjectMigrationWidget)
 					.Visibility(this, &SMigrationWidget::GetProjectMigrationWidgetVisibility)
 				]
-
 				+ SVerticalBox::Slot()
 				.Padding(0, 5)
 				.AutoHeight()
@@ -171,14 +178,15 @@ void SMigrationWidget::Construct(const FArguments& InArgs)
 					.Text(LOCTEXT("GeneralInfo",
 						"If you choose the cancel option or a subset of operations to perform, you can open this dialog at a later time from the Build Menu under Audiokinetic > Finish Project Migration.\n"
 					))
-					.Font(FEditorStyle::GetFontStyle("StandardDialog.LargeFont"))
+					.Font(FAkAppStyle::Get().GetFontStyle("StandardDialog.LargeFont"))
+					.AutoWrapText(true)
 				]
 
 				+ SVerticalBox::Slot()
 				.AutoHeight()
 				[
 					SNew(SBorder)
-					.BorderImage(FEditorStyle::GetBrush("ToolPanel.GroupBorder"))
+					.BorderImage(FAkAppStyle::Get().GetBrush("ToolPanel.GroupBorder"))
 					.VAlign(VAlign_Center)
 					.HAlign(HAlign_Center)
 					[
@@ -188,14 +196,14 @@ void SMigrationWidget::Construct(const FArguments& InArgs)
 						.AutoWidth()
 						[
 							SNew(SButton)
-							.ButtonStyle(FEditorStyle::Get(), "FlatButton.Success")
+							.ButtonStyle(FAkAppStyle::Get(), "FlatButton.Success")
 							.ForegroundColor(FLinearColor::White)
 							.OnClicked(this, &SMigrationWidget::OnContinueClicked)
 							.IsEnabled(this, &SMigrationWidget::CanClickContinue)
 							.ToolTipText(this, &SMigrationWidget::GetContinueToolTip)
 							[
 								SNew(STextBlock)
-								.TextStyle(FEditorStyle::Get(), "FlatButton.DefaultTextStyle")
+								.TextStyle(FAkAppStyle::Get(), "FlatButton.DefaultTextStyle")
 								.Text(FText::FromString("Continue"))
 							]
 						]
@@ -205,13 +213,13 @@ void SMigrationWidget::Construct(const FArguments& InArgs)
 						.AutoWidth()
 						[
 							SNew(SButton)
-							.ButtonStyle(FEditorStyle::Get(), "FlatButton.Default")
+							.ButtonStyle(FAkAppStyle::Get(), "FlatButton.Default")
 							.ForegroundColor(FLinearColor::White)
 							.OnClicked(this, &SMigrationWidget::OnCancelClicked)
 							.ToolTipText(FText::FromString("Cancel"))
 							[
 								SNew(STextBlock)
-								.TextStyle(FEditorStyle::Get(), "FlatButton.DefaultTextStyle")
+								.TextStyle(FAkAppStyle::Get(), "FlatButton.DefaultTextStyle")
 								.Text(FText::FromString("Cancel"))
 							]
 						]
@@ -219,26 +227,42 @@ void SMigrationWidget::Construct(const FArguments& InArgs)
 				]
 			]
 		]
+		]
 	];
 }
 
 bool SMigrationWidget::CanClickContinue() const
 {
-	if (bShowBankTransfer && BankTransferWidget->SoundBankTransferCheckBox->IsChecked() && BankTransferWidget->BankTransferMethod == AkAssetMigration::EBankTransferMode::NoTransfer)
+	if (bShowBankTransfer && BankTransferWidget->SoundBankTransferCheckBox->IsChecked())
 	{
-		return false;	
+		if (BankTransferWidget->BankTransferMethod == AkAssetMigration::EBankTransferMode::NoTransfer)
+		{
+			return false;	
+		}
+		if (BankTransferWidget->BankTransferMethod == AkAssetMigration::EBankTransferMode::DefinitionFile && BankTransferWidget->SoundBankDefinitionFilePath.IsEmpty())
+		{
+			return false;
+		}
 	}
 	return true;
 }
 
 FText SMigrationWidget::GetContinueToolTip() const
 {
-	if (bShowBankTransfer && BankTransferWidget->SoundBankTransferCheckBox->IsChecked() && BankTransferWidget->BankTransferMethod == AkAssetMigration::EBankTransferMode::NoTransfer)
+	if (bShowBankTransfer && BankTransferWidget->SoundBankTransferCheckBox->IsChecked())
 	{
-		return FText::FromString("Please choose a SoundBank transfer method first");
+		if (BankTransferWidget->BankTransferMethod == AkAssetMigration::EBankTransferMode::NoTransfer)
+		{
+			return FText::FromString("Please choose a SoundBank transfer method first");
+		}
+		if (BankTransferWidget->BankTransferMethod == AkAssetMigration::EBankTransferMode::DefinitionFile && BankTransferWidget->SoundBankDefinitionFilePath.IsEmpty())
+		{
+			return FText::FromString("Please choose a SoundBank Defintion file path first");
+		}
 	}
 	return  FText::FromString("Continue");
 }
+
 FReply SMigrationWidget::OnContinueClicked()
 {
 	FSlateApplication::Get().RequestDestroyWindow(Dialog.ToSharedRef());
@@ -280,6 +304,8 @@ EVisibility SMigrationWidget::GetProjectMigrationWidgetVisibility() const
 
 void SBankTransferWidget::Construct(const FArguments& InArgs)
 {
+	SoundBankDefinitionFilePath = AkUnrealHelper::GetProjectDirectory() + "SoundBankDefinition.tsv";
+
 	ChildSlot
 	[
 		SNew(SVerticalBox)
@@ -293,7 +319,7 @@ void SBankTransferWidget::Construct(const FArguments& InArgs)
 			[
 				SNew(STextBlock)
 				.Text(LOCTEXT("SounbankMigrationHeader", "Soundbank Migration"))
-				.Font(FEditorStyle::GetFontStyle("DetailsView.CategoryFontStyle"))
+				.Font(FAkAppStyle::Get().GetFontStyle("DetailsView.CategoryFontStyle"))
 				.ShadowOffset(FVector2D(1.0f, 1.0f))
 			]
 			.BodyContent()
@@ -302,7 +328,7 @@ void SBankTransferWidget::Construct(const FArguments& InArgs)
 				+ SVerticalBox::Slot()
 				[
 					SNew(SBorder)
-					.BorderImage(FEditorStyle::GetBrush("ToolPanel.GroupBorder"))
+					.BorderImage(FAkAppStyle::Get().GetBrush("ToolPanel.GroupBorder"))
 					.Padding(4.0f)
 					[
 						SNew(SVerticalBox)
@@ -318,99 +344,13 @@ void SBankTransferWidget::Construct(const FArguments& InArgs)
 						[
 							SNew(STextBlock)
 							.Text(LOCTEXT("BankMigrationMessageBegin",
-								"New in Wwise 2022.1 : SoundBank management has been returned to Wwise Authoring, therefore you may want to transfer your SoundBank structures back to Wwise Authoring.\n"
-								"SoundBank assets are no longer used in the integration and should be deleted.\n"
+								"AkAudioBanks assets are no longer used in the integration and must be deleted.\n"
+								"You can optionally transfer your SoundBank structures defined in Unreal back to Wwise Authoring (before deleting them).\n"
+								"The 'Auto Load' property on AkAudioBank assets can also optionally be transferred to the assets that were grouped in them.\n"
+								
 							))
 							.AutoWrapText(true)
 						]
-
-						+ SVerticalBox::Slot()
-						.AutoHeight()
-						.HAlign(EHorizontalAlignment::HAlign_Fill)
-						[
-							SAssignNew(ExpandableDetails, SExpandableArea)
-							.InitiallyCollapsed(true)
-							.BorderBackgroundColor(FLinearColor(0.6f, 0.6f, 0.6f, 1.0f))
-							.BorderImage_Lambda([this]() { return MigrationDialogUtils::GetExpandableAreaBorderImage(*ExpandableDetails); })
-							.HeaderContent()
-							[
-								SNew(STextBlock)
-								.Text(LOCTEXT("BankMigration_WhatHappens", "Details"))
-								.Font(FEditorStyle::GetFontStyle("DetailsView.CategoryFontStyle"))
-								.ShadowOffset(FVector2D(1.0f, 1.0f))
-							]
-							.BodyContent()
-							[
-								SNew(SHorizontalBox)
-								+ SHorizontalBox::Slot()
-								.AutoWidth()
-								[
-									SNew(SVerticalBox)
-									+ SVerticalBox::Slot()
-									.Padding(20, 0)
-									.AutoHeight()
-									.HAlign(EHorizontalAlignment::HAlign_Left)
-									[
-										SNew(STextBlock)
-										.Text(LOCTEXT("BankMigrationMessageWhatHappens",
-											"The following options will help you transfer the SoundBanks back to your Wwise project, as well as clean up these assets.\n"
-											"- Transfer SoundBanks To Wwise : This will create a SoundBank in Wwise Authoring for each AkAudioBank asset in the Unreal project.\n"
-											"    - Events and Buses linked to SoundBanks will be added to their corresponding banks in Wwise Authoring.\n"
-											"- Transfer Auto Load property : SoundBanks' Auto Load property will be set on each of the Event and Bus assets contained in the bank.\n"
-											"- Delete AkAudioBank Assets : AkAudioBank assets will be deleted after other operations have completed."
-
-										))
-										.AutoWrapText(true)
-									]
-
-									+ SVerticalBox::Slot()
-									.Padding(20, 10)
-									.AutoHeight()
-									.HAlign(EHorizontalAlignment::HAlign_Left)
-									[
-										SNew(SHyperlink)
-										.Text(LOCTEXT("BankMigrationMessageLink", "For more information about this process, please refer to the Integration documentation "))
-										.OnNavigate_Lambda([=]() { FPlatformProcess::LaunchURL(TEXT("https://www.audiokinetic.com/library/edge/?source=UE4&id=releasenotes.html"), nullptr, nullptr); })
-									]
-
-									+ SVerticalBox::Slot()
-									.AutoHeight()
-									.Padding(20, 0)
-									.HAlign(EHorizontalAlignment::HAlign_Left)
-									[
-										SNew(STextBlock)
-										.Text(LOCTEXT("BankTransferDetailsText",
-											"There are two methods of transferring SoundBanks : WAAPI or SoundBank Definition file\n"))
-									]
-
-									+ SVerticalBox::Slot()
-									.AutoHeight()
-									.Padding(20, 0)
-									.HAlign(EHorizontalAlignment::HAlign_Left)
-									[
-										SNew(STextBlock)
-										.Text(LOCTEXT("BankTransferDetailsList",
-											"- If WAAPI is connected, you can choose to transfer SoundBanks and their contents directly to the Wwise project using WAAPI\n"
-											"- Otherwise, you can choose to create a SoundBank Definition file, which can be manually imported into Wwise at a later time.\n"
-											"   - In either case, if you also check \"Delete AkAudioBank Assets\", only banks that were successfully transferred (or written to the definition file) will be deleted.\n"
-											"- If you only check \"Delete AkAudioBank Assets\", all AkAudioBank assets will be deleted and transferring banks will no longer be possible. "
-										))
-										.AutoWrapText(true)
-									]
-
-									+ SVerticalBox::Slot()
-									.AutoHeight()
-									.Padding(20, 10)
-									.HAlign(EHorizontalAlignment::HAlign_Left)
-									[
-										SNew(SHyperlink)
-										.Text(LOCTEXT("BankMigrationBankDefinitionMessageLink", "SoundBank definition file documentation"))
-										.OnNavigate_Lambda([=]() { FPlatformProcess::LaunchURL(TEXT("https://www.audiokinetic.com/library/edge/?source=Help&id=populating_soundbank_by_importing_definition_file"), nullptr, nullptr); })
-									]
-								]
-							]
-						]
-
 						+ SVerticalBox::Slot()
 						.FillHeight(0.10f)
 						[
@@ -439,9 +379,9 @@ void SBankTransferWidget::Construct(const FArguments& InArgs)
 								.Content()
 								[
 									SNew(STextBlock)
-									.Text(LOCTEXT("DoTransferMessage", " Transfer SoundBanks To Wwise"))
-									.ToolTipText(LOCTEXT("TransferAkAudioBankToolTip", "Create SoundBanks in the Wwise project matching the AkAudioBank assets in Unreal.\nThey will contain the same Events and Aux Buses that were grouped into the unreal assets."))
-									.Font(FEditorStyle::GetFontStyle("StandardDialog.LargeFont"))
+									.Text(LOCTEXT("DoTransferMessage", "Transfer SoundBanks To Wwise"))
+									.ToolTipText(LOCTEXT("TransferAkAudioBankToolTip", "Create SoundBanks in the Wwise project matching the AkAudioBank assets in Unreal.\nThey will contain the same Events and Aux Busses that were grouped into the Unreal assets."))
+									.Font(FAkAppStyle::Get().GetFontStyle("StandardDialog.LargeFont"))
 								]
 							]
 
@@ -453,7 +393,7 @@ void SBankTransferWidget::Construct(const FArguments& InArgs)
 								SNew(SBorder)
 								.BorderBackgroundColor(this, &SBankTransferWidget::GetDropDownBorderColour)
 								.ColorAndOpacity(this, &SBankTransferWidget::GetDropDownColour)
-								.BorderImage(FEditorStyle::GetBrush("ToolPanel.GroupBorder"))
+								.BorderImage(FAkAppStyle::Get().GetBrush("ToolPanel.GroupBorder"))
 								[
 									SNew(SComboButton)
 									.ToolTipText(LOCTEXT("ComboButtonTip", "Choose a transfer method from the drop-down menu."))
@@ -468,6 +408,15 @@ void SBankTransferWidget::Construct(const FArguments& InArgs)
 								]
 							]
 						]
+						+ SVerticalBox::Slot()
+						.Padding(0, 5)
+						.AutoHeight()
+						[
+							SAssignNew(SoundBankDefinitionFilePathPicker, SDefinitionFilePicker)
+							.FilePath(SoundBankDefinitionFilePath)
+							.OnFileChanged(this, &SBankTransferWidget::SetDefinitionFilePath)
+							.Visibility(this, &SBankTransferWidget::GetDefinitionFilePathVisibility)
+						]
 						+SVerticalBox::Slot()
 						.AutoHeight()
 						.Padding(0.0f, 2.0f)
@@ -475,12 +424,12 @@ void SBankTransferWidget::Construct(const FArguments& InArgs)
 						[
 							SAssignNew(TransferAutoLoadCheckBox, SCheckBox)
 								.IsChecked(ECheckBoxState::Checked)
-								.ToolTipText(LOCTEXT("TransferAutoloadMessage", " Transfer SoundBank Auto Load property to assets"))
+								.ToolTipText(LOCTEXT("TransferAutoloadTooltip", "Transfer SoundBank Auto Load property from deprecated AkAudioBank assets to the AkAudioType assets that were grouped in them."))
 								.Content()
 								[
 									SNew(STextBlock)
-									.Text(LOCTEXT("TransferAutoloadMessage", "Transfer Auto Load property"))
-									.Font(FEditorStyle::GetFontStyle("StandardDialog.LargeFont"))
+									.Text(LOCTEXT("TransferAutoloadMessage", "Transfer Auto Load property from AkAudioBank assets to AkAudioType assets"))
+									.Font(FAkAppStyle::Get().GetFontStyle("StandardDialog.LargeFont"))
 								]
 						]
 						+SVerticalBox::Slot()
@@ -493,9 +442,9 @@ void SBankTransferWidget::Construct(const FArguments& InArgs)
 							.Content()
 							[
 								SNew(STextBlock)
-								.Text(LOCTEXT("DeleteAkAudioBankMessage", " Delete AkAudioBank Assets "))
-								.ToolTipText(LOCTEXT("DeleteAkAudioBankToolTip", "In WAAPI mode, only assets that were successfully transferred are deleted.\nIn SoundBank definition mode, the assets are deleted after the file is successfully written.\n If SoundBankTransfer is not enabled, assets will simply be deleted"))
-								.Font(FEditorStyle::GetFontStyle("StandardDialog.LargeFont"))
+								.Text(LOCTEXT("DeleteAkAudioBankMessage", " Delete AkAudioBank Assets"))
+								.ToolTipText(LOCTEXT("DeleteAkAudioBankToolTip", "Delete all AkAudioBank assets in the unreal project."))
+								.Font(FAkAppStyle::Get().GetFontStyle("StandardDialog.LargeFont"))
 							]
 						]
 					]
@@ -503,6 +452,16 @@ void SBankTransferWidget::Construct(const FArguments& InArgs)
 			]
 		]
 	];
+}
+
+EVisibility SBankTransferWidget::GetDefinitionFilePathVisibility() const
+{
+	return SoundBankTransferCheckBox->IsChecked() && BankTransferMethod == AkAssetMigration::EBankTransferMode::DefinitionFile ? EVisibility::Visible : EVisibility::Collapsed;
+}
+
+void SBankTransferWidget::SetDefinitionFilePath(const FString& PickedPath)
+{
+	SoundBankDefinitionFilePath = PickedPath;
 }
 
 void SBankTransferWidget::SetTransferMethod(AkAssetMigration::EBankTransferMode TransferMethod)
@@ -584,7 +543,6 @@ TSharedRef<SWidget> SBankTransferWidget::OnGetTransferMethodMenu()
 
 bool SBankTransferWidget::CheckWaapiConnection() const
 {
-
 	bool bWaapiConnected = false;
 	if (auto UserSettings =  GetDefault<UAkSettingsPerUser>())
 	{
@@ -624,8 +582,8 @@ void SDeprecatedAssetCleanupWidget::Construct(const FArguments& InArgs)
 			.HeaderContent()
 			[
 				SNew(STextBlock)
-				.Text(LOCTEXT("MediaCleanupHeader", "Clean up deprecated assets"))
-				.Font(FEditorStyle::GetFontStyle("DetailsView.CategoryFontStyle"))
+				.Text(LOCTEXT("MediaCleanupHeader", "Delete deprecated assets"))
+				.Font(FAkAppStyle::Get().GetFontStyle("DetailsView.CategoryFontStyle"))
 				.ShadowOffset(FVector2D(1.0f, 1.0f))
 			]
 			.BodyContent()
@@ -634,7 +592,7 @@ void SDeprecatedAssetCleanupWidget::Construct(const FArguments& InArgs)
 				+ SVerticalBox::Slot()
 				[
 				SNew(SBorder)
-				.BorderImage(FEditorStyle::GetBrush("ToolPanel.GroupBorder"))
+				.BorderImage(FAkAppStyle::Get().GetBrush("ToolPanel.GroupBorder"))
 				.Padding(4.0f)
 				[
 					SNew(SVerticalBox)
@@ -645,48 +603,11 @@ void SDeprecatedAssetCleanupWidget::Construct(const FArguments& InArgs)
 					[
 						SNew(STextBlock)
 						.Text(FText::FormatOrdered(LOCTEXT("AssetCleanupMessageBegin",
-							"AkMediaAsset, AkFolder and AkPlatformAssetData have been deprecated, all assets of this type should be removed from the project. "
+							"AkMediaAsset, AkFolder and AkPlatformAssetData have been deprecated, all assets of this type will be deleted from the project. "
 							"The project currently contains {0} such assets.\n"), FText::FromString(FString::FromInt(InArgs._NumDeprecatedAssets))
 						))
 						.AutoWrapText(true)
 					]
-
-					+ SVerticalBox::Slot()
-					.AutoHeight()
-					.Padding(4.0f)
-					.HAlign(EHorizontalAlignment::HAlign_Fill)
-					[
-						SAssignNew(ExpandableDetails, SExpandableArea)
-						.InitiallyCollapsed(true)
-						.BorderBackgroundColor(FLinearColor(0.6f, 0.6f, 0.6f, 1.0f))
-						.BorderImage_Lambda([this]() { return MigrationDialogUtils::GetExpandableAreaBorderImage(*ExpandableDetails); })
-						.HeaderContent()
-						[
-							SNew(STextBlock)
-							.Text(LOCTEXT("AssetCleanupAreaTitle", "Details"))
-							.Font(FEditorStyle::GetFontStyle("DetailsView.CategoryFontStyle"))
-							.ShadowOffset(FVector2D(1.0f, 1.0f))
-						]
-						.BodyContent()
-						[
-							SNew(SVerticalBox)
-							+ SVerticalBox::Slot()
-							.AutoHeight()
-							.Padding(20, 0)
-							.HAlign(EHorizontalAlignment::HAlign_Left)
-							[
-								SNew(STextBlock)
-								.Text(LOCTEXT("AssetCleanupDetails",
-									"- All AkMediaAsset assets in the project will be deleted.\n"
-									"- All AkFolder assets in the project will be deleted.\n"
-									"- All AkPlatformAssetData assets (previously used for localized events) in the project will be deleted.\n"
-									"- This will only delete the assets, any remaining directory structures will have to be cleaned up manually.\n"
-								))
-								.AutoWrapText(true)
-							]
-						]
-					]
-
 					+ SVerticalBox::Slot()
 					.AutoHeight()
 					.Padding(0.0f, 2.0f)
@@ -699,7 +620,7 @@ void SDeprecatedAssetCleanupWidget::Construct(const FArguments& InArgs)
 							SNew(STextBlock)
 							.Text(LOCTEXT("DeleteAssetMessage", " Delete deprecated assets"))
 							.ToolTipText(LOCTEXT("DeleteMediaToolTip", "Delete all deprecated assets that are still in the project"))
-							.Font(FEditorStyle::GetFontStyle("StandardDialog.LargeFont"))
+							.Font(FAkAppStyle::Get().GetFontStyle("StandardDialog.LargeFont"))
 							]
 						]
 					]
@@ -723,8 +644,8 @@ void SAssetMigrationWidget::Construct(const FArguments& InArgs)
 			.HeaderContent()
 			[
 				SNew(STextBlock)
-				.Text(LOCTEXT("UpdateAssetsHeader", "Wwise Assets are out of date"))
-				.Font(FEditorStyle::GetFontStyle("DetailsView.CategoryFontStyle"))
+				.Text(LOCTEXT("UpdateAssetsHeader", "Migrate Wwise Assets"))
+				.Font(FAkAppStyle::Get().GetFontStyle("DetailsView.CategoryFontStyle"))
 				.ShadowOffset(FVector2D(1.0f, 1.0f))
 			]
 			.BodyContent()
@@ -733,7 +654,7 @@ void SAssetMigrationWidget::Construct(const FArguments& InArgs)
 				+ SVerticalBox::Slot()
 				[
 					SNew(SBorder)
-					.BorderImage(FEditorStyle::GetBrush("ToolPanel.GroupBorder"))
+					.BorderImage(FAkAppStyle::Get().GetBrush("ToolPanel.GroupBorder"))
 					.Padding(4.0f)
 					[
 						SNew(SVerticalBox)
@@ -750,45 +671,10 @@ void SAssetMigrationWidget::Construct(const FArguments& InArgs)
 							SNew(STextBlock)
 							.Text(LOCTEXT("AssetMigrationMessageBegin",
 								"Wwise asset properties have changed and they no longer serialize SoundBank or media binary data.\n"
+								"Wwise asset properties will be updated and reserialized to the disk."
 							))
 							.AutoWrapText(true)
 						]
-
-						+ SVerticalBox::Slot()
-						.AutoHeight()
-						.HAlign(EHorizontalAlignment::HAlign_Fill)
-						[
-							SAssignNew(ExpandableDetails, SExpandableArea)
-							.InitiallyCollapsed(true)
-							.BorderBackgroundColor(FLinearColor(0.6f, 0.6f, 0.6f, 1.0f))
-							.BorderImage_Lambda([this]() { return MigrationDialogUtils::GetExpandableAreaBorderImage(*ExpandableDetails); })
-							.HeaderContent()
-							[
-								SNew(STextBlock)
-								.Text(LOCTEXT("AssetMigrateAreaTitle", "Details"))
-								.Font(FEditorStyle::GetFontStyle("DetailsView.CategoryFontStyle"))
-								.ShadowOffset(FVector2D(1.0f, 1.0f))
-							]
-							.BodyContent()
-							[
-								SNew(SVerticalBox)
-								+ SVerticalBox::Slot()
-								.AutoHeight()
-								.Padding(20, 0)
-								.HAlign(EHorizontalAlignment::HAlign_Left)
-								[
-									SNew(STextBlock)
-									.Text(LOCTEXT("AssetMigrationDetails",
-										"- The only information serialized in the assets is their Wwise GUID, ShortID, and Name.\n"
-										"- Checking the following option will mark all Wwise assets as dirty and save them so they can be reserialized to the disk with the correct data.\n"
-										"- The Split Switch Container Media setting is removed, and will be applied to events individually.\n"
-										"- WARNING : After performing this operation, it will no longer be possible to transfer the contents of AkAudioBanks to Wwise as the references will have been cleared.\n"
-									))
-									.AutoWrapText(true)
-								]
-							]
-						]
-
 						+ SVerticalBox::Slot()
 						.AutoHeight()
 						.Padding(0.0f, 2.0f)
@@ -800,7 +686,7 @@ void SAssetMigrationWidget::Construct(const FArguments& InArgs)
 							[
 								SNew(STextBlock)
 								.Text(LOCTEXT("MigrateAssetsMessage", " Migrate Wwise assets"))
-								.Font(FEditorStyle::GetFontStyle("StandardDialog.LargeFont"))
+								.Font(FAkAppStyle::Get().GetFontStyle("StandardDialog.LargeFont"))
 								.ToolTipText(LOCTEXT("MigrateAssetsTooltip", "Dirty and save all Wwise assets"))
 							]
 						]
@@ -825,8 +711,8 @@ void SProjectMigrationWidget::Construct(const FArguments& InArgs)
 			.HeaderContent()
 			[
 				SNew(STextBlock)
-				.Text(LOCTEXT("ProjectChangesHeader", "Modifications to the Wwise and Unreal projects are required"))
-				.Font(FEditorStyle::GetFontStyle("DetailsView.CategoryFontStyle"))
+				.Text(LOCTEXT("ProjectChangesHeader", "Update Wwise and Unreal project settings"))
+				.Font(FAkAppStyle::Get().GetFontStyle("DetailsView.CategoryFontStyle"))
 				.ShadowOffset(FVector2D(1.0f, 1.0f))
 			]
 			.BodyContent()
@@ -835,7 +721,7 @@ void SProjectMigrationWidget::Construct(const FArguments& InArgs)
 				+ SVerticalBox::Slot()
 				[
 					SNew(SBorder)
-					.BorderImage(FEditorStyle::GetBrush("ToolPanel.GroupBorder"))
+					.BorderImage(FAkAppStyle::Get().GetBrush("ToolPanel.GroupBorder"))
 					.Padding(4.0f)
 					[
 						SNew(SVerticalBox)
@@ -851,52 +737,10 @@ void SProjectMigrationWidget::Construct(const FArguments& InArgs)
 						[
 							SNew(STextBlock)
 							.Text(LOCTEXT("ProjectSettingsMigrationMessageBegin",
-								"Some SoundBank generation settings in your Wwise project, and some Wwise Integration settings in your Unreal project, need to be modified.\n"
+								"SoundBank generation settings in your Wwise project, and the Wwise Integration settings in your Unreal project, need to be updated.\n"
 							))
 							.AutoWrapText(true)
 						]
-
-						+ SVerticalBox::Slot()
-						.AutoHeight()
-						.HAlign(EHorizontalAlignment::HAlign_Fill)
-						[
-							SAssignNew(ExpandableDetails, SExpandableArea)
-							.InitiallyCollapsed(true)
-							.BorderBackgroundColor(FLinearColor(0.6f, 0.6f, 0.6f, 1.0f))
-							.BorderImage_Lambda([this]() { return MigrationDialogUtils::GetExpandableAreaBorderImage(*ExpandableDetails); })
-							.HeaderContent()
-							[
-								SNew(STextBlock)
-								.Text(LOCTEXT("ProjectMigrateDetailsHeader", "Details"))
-								.Font(FEditorStyle::GetFontStyle("DetailsView.CategoryFontStyle"))
-								.ShadowOffset(FVector2D(1.0f, 1.0f))
-							]
-							.BodyContent()
-							[
-								SNew(SVerticalBox)
-								+ SVerticalBox::Slot()
-								.AutoHeight()
-								.Padding(20, 0)
-								.HAlign(EHorizontalAlignment::HAlign_Left)
-								[
-									SNew(STextBlock)
-									.Text(FText::FormatOrdered(LOCTEXT("ProjectChanges",
-										"If you were using EBP : \n"
-										"  - The \"Enable Auto Defined SoundBanks\" setting will be enabled in the Wwise Project \n"
-										"  - The \"Split Media Per Folder\" setting will be migrated to the \"Create Sub-Folders for Generated Files\" setting the Wwise Project \n"
-										"  - The Wwise Sound Data Folder will be removed from DirectoriesToAlwaysCook \n"
-										"\n"
-										"If you are using the Legacy Workflow: \n"
-										"  - The Wwise Sound Data Folder will be removed from DirectoriesToAlwaysStageAsUFS\n"
-										"  - Generated .bnk and .wem files in {0} will be deleted\n"
-										"In all cases: \n"
-										"  - The \"Root Output Path\" SoundBank setting in Wwise will be imported to the \"Generated SoundBanks Folder\" integration setting in Unreal Engine.\n"
-									), FText::FromString(AkUnrealEditorHelper::GetLegacySoundBankDirectory())))
-									.AutoWrapText(true)
-								]
-							]
-						]
-
 						+ SVerticalBox::Slot()
 						.AutoHeight()
 						.Padding(0.0f, 2.0f)
@@ -908,13 +752,240 @@ void SProjectMigrationWidget::Construct(const FArguments& InArgs)
 							[
 								SNew(STextBlock)
 								.Text(LOCTEXT("UpdateProjectMessage", "Update project settings"))
-								.Font(FEditorStyle::GetFontStyle("StandardDialog.LargeFont"))
+								.Font(FAkAppStyle::Get().GetFontStyle("StandardDialog.LargeFont"))
 								.ToolTipText(LOCTEXT("UpdateProjectTooltip", "Update Unreal project settings"))
 							]
+						]
+						+ SVerticalBox::Slot()
+						.Padding(0, 5)
+						.AutoHeight()
+						[
+							SNew(STextBlock)
+							.Text(LOCTEXT("AkGeneratedSoundBanksFolderMigration",
+							"\nGeneratedSoundBanks folder location:"
+							))
+							.Visibility(this, &SProjectMigrationWidget::GetPathVisibility)
+
+						]
+						+ SVerticalBox::Slot()
+						.Padding(0, 5)
+						.AutoHeight()
+						[
+							SAssignNew(GeneratedSoundBanksFolderPickerWidget, SDirectoryPicker)
+							.Directory(AkUnrealHelper::GetSoundBankDirectory())
+							.Visibility(this, &SProjectMigrationWidget::GetPathVisibility)
 						]
 					]
 				]
 			]
 		]
 	];
+}
+
+EVisibility SProjectMigrationWidget::GetPathVisibility() const
+{
+	return AutoMigrateCheckbox->IsChecked() ? EVisibility::Visible : EVisibility::Collapsed;
+}
+
+void SBankMigrationFailureWidget::Construct(const FArguments& InArgs)
+{
+	Dialog = InArgs._Dialog;
+	ChildSlot
+		[
+			SNew(SVerticalBox)
+			+ SVerticalBox::Slot()
+			[
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot()
+				.Padding(4.0f)
+
+				.AutoHeight()
+				[
+					SNew(STextBlock)
+					.Text(LOCTEXT("BankMigrationFailureHeader", "Errors encountered while transfering banks"))
+					.Font(FAkAppStyle::Get().GetFontStyle("DetailsView.CategoryFontStyle"))
+					.ShadowOffset(FVector2D(1.0f, 1.0f))
+				]
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				.Padding(4.0f)
+				[
+					SNew(SBorder)
+					.BorderImage(FAkAppStyle::Get().GetBrush("ToolPanel.GroupBorder"))
+					[
+						SNew(SVerticalBox)
+						+ SVerticalBox::Slot()
+						.MaxHeight(600)
+						.HAlign(EHorizontalAlignment::HAlign_Left)
+						[
+							SNew(SMultiLineEditableTextBox)
+							.Text(InArgs._ErrorMessage)
+							.AutoWrapText(true)
+							.IsReadOnly(true)
+						]
+					]
+				]
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				.VAlign(VAlign_Center)
+				.HAlign(HAlign_Center)
+				.Padding(4.0f)
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot()
+					.Padding(2.0f)
+					.AutoWidth()
+					[
+						SNew(SButton)
+						.ButtonStyle(FAkAppStyle::Get(), "FlatButton.Default")
+						.ForegroundColor(FLinearColor::White)
+						.OnClicked(this, &SBankMigrationFailureWidget::OnIgnoreClicked)
+						.ToolTipText(FText::FromString("Ignore warnings and continue migration"))
+						[
+							SNew(STextBlock)
+							.TextStyle(FAkAppStyle::Get(), "FlatButton.DefaultTextStyle")
+							.Text(FText::FromString("Ignore Errors and Continue"))
+						]
+					]
+					+ SHorizontalBox::Slot()
+					.Padding(2.0f)
+					.AutoWidth()
+					[
+						SNew(SButton)
+						.ButtonStyle(FAkAppStyle::Get(), "FlatButton.Default")
+						.ForegroundColor(FLinearColor::White)
+						.OnClicked(this, &SBankMigrationFailureWidget::OnCancelClicked)
+						.ToolTipText(FText::FromString("Cancel the migration process to re-attempt at a later time"))
+						[
+							SNew(STextBlock)
+							.TextStyle(FAkAppStyle::Get(), "FlatButton.DefaultTextStyle")
+							.Text(FText::FromString("Cancel Migration"))
+						]
+					]
+				]
+			]
+		];
+}
+
+FReply SBankMigrationFailureWidget::OnCancelClicked()
+{
+	bCancel = true;
+	FSlateApplication::Get().RequestDestroyWindow(Dialog.ToSharedRef());
+	return FReply::Handled();
+}
+
+FReply SBankMigrationFailureWidget::OnIgnoreClicked()
+{
+	bCancel = false;
+	FSlateApplication::Get().RequestDestroyWindow(Dialog.ToSharedRef());
+	return FReply::Handled();
+}
+
+void SDefinitionFilePicker::Construct( const FArguments& InArgs )
+{
+	OnFileChanged = InArgs._OnFileChanged;
+
+	FilePath = InArgs._FilePath;
+	Message = InArgs._Message;
+
+	TSharedPtr<SButton> OpenButton;
+	ChildSlot
+	[
+		SNew(SHorizontalBox)
+
+		+ SHorizontalBox::Slot()
+		.FillWidth(1.0f)
+		[
+			SAssignNew(EditableTextBox, SEditableTextBox)
+			.Text(this, &SDefinitionFilePicker::GetFilePathText)
+			.OnTextChanged(this, &SDefinitionFilePicker::OnFileTextChanged)
+			.OnTextCommitted(this, &SDefinitionFilePicker::OnFileTextCommited)
+		]
+
+		+ SHorizontalBox::Slot()
+		.AutoWidth()
+		.Padding(4.0f, 0.0f, 0.0f, 0.0f)
+		[
+			SAssignNew(OpenButton, SButton)
+			.ToolTipText(Message)
+			.OnClicked(this, &SDefinitionFilePicker::BrowseForFile)
+			[
+				SNew(STextBlock)
+				.Text(FText::FromString(TEXT("...")))
+			]
+		]
+	];
+
+	OpenButton->SetEnabled(InArgs._IsEnabled);
+}
+
+void SDefinitionFilePicker::OnFileTextChanged(const FText& InFilePath)
+{
+	FilePath = InFilePath.ToString();
+}
+
+void SDefinitionFilePicker::OnFileTextCommited(const FText& InText, ETextCommit::Type InCommitType)
+{
+	FilePath = InText.ToString();
+	OnFileChanged.ExecuteIfBound(FilePath);
+}
+	
+FString SDefinitionFilePicker::GetFilePath() const
+{
+	return FilePath;
+}
+
+FText SDefinitionFilePicker::GetFilePathText() const
+{
+	return FText::FromString(GetFilePath());
+}
+
+bool SDefinitionFilePicker::OpenDefinitionFilePicker(FString& OutFilePath, const FString& DefaultFilePath)
+{
+	TArray<FString> OpenFileNames;
+	bool bOpened = false;
+
+	IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
+	if (DesktopPlatform)
+	{
+		void* ParentWindowWindowHandle = NULL;
+
+		IMainFrameModule& MainFrameModule = FModuleManager::LoadModuleChecked<IMainFrameModule>(TEXT("MainFrame"));
+		const TSharedPtr<SWindow>& MainFrameParentWindow = MainFrameModule.GetParentWindow();
+		if (MainFrameParentWindow.IsValid() && MainFrameParentWindow->GetNativeWindow().IsValid())
+		{
+			ParentWindowWindowHandle = MainFrameParentWindow->GetNativeWindow()->GetOSWindowHandle();
+		}
+
+		bool bAllowMultiSelect = false;
+		FString FileTypes = TEXT("TSV Files (*.tsv)|*.tsv");
+		FString DefaultFolder = FPaths::GetPath(DefaultFilePath);
+		FString DefaultFile =  FPaths::GetCleanFilename(DefaultFilePath);
+		const FString Title = TEXT("Choose location for definition file");
+		bOpened = DesktopPlatform->SaveFileDialog(
+			ParentWindowWindowHandle,
+			Title,
+			*DefaultFolder,
+			*DefaultFile,
+			FileTypes,
+			bAllowMultiSelect,
+			OpenFileNames
+		);
+	}
+	if (bOpened)
+	{
+		OutFilePath = FPaths::ConvertRelativePathToFull(OpenFileNames[0]);
+	}
+
+	return bOpened;
+}
+
+FReply SDefinitionFilePicker::BrowseForFile()
+{
+	if ( OpenDefinitionFilePicker(FilePath, FilePath) )
+	{
+		OnFileChanged.ExecuteIfBound(FilePath);
+	}
+
+	return FReply::Handled();
 }

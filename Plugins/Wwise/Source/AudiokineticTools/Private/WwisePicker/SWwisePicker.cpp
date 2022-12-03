@@ -1,18 +1,19 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
-Copyright (c) 2021 Audiokinetic Inc.
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
+Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
-
 
 /*------------------------------------------------------------------------------------
 	SWwisePicker.cpp
@@ -24,6 +25,7 @@ Copyright (c) 2021 Audiokinetic Inc.
 
 #include "AkAudioBankGenerationHelpers.h"
 #include "AkAudioDevice.h"
+#include "AkAudioModule.h"
 #include "AkAudioStyle.h"
 #include "AkAudioType.h"
 #include "AkSettings.h"
@@ -48,6 +50,7 @@ Copyright (c) 2021 Audiokinetic Inc.
 #include "WwisePicker/WwiseAssetDragDropOp.h"
 #include "WwisePicker/WwisePickerHelpers.h"
 #include "WwisePicker/WwisePickerDataLoader.h"
+#include <ISettingsModule.h>
 
 #define LOCTEXT_NAMESPACE "AkAudio"
 
@@ -125,7 +128,7 @@ void SWwisePicker::Construct(const FArguments& InArgs)
 	[
 		SNew(SBorder)
 		.Padding(4)
-		.BorderImage(FEditorStyle::GetBrush("ToolPanel.GroupBorder"))
+		.BorderImage(FAkAppStyle::Get().GetBrush("ToolPanel.GroupBorder"))
 		[
 			SNew(SOverlay)
 
@@ -177,7 +180,7 @@ void SWwisePicker::Construct(const FArguments& InArgs)
 					.Padding(0,0,3,0)
 					[
 						SNew(STextBlock)
-						.Font( FEditorStyle::GetFontStyle("ContentBrowser.SourceTitleFont") )
+						.Font( FAkAppStyle::Get().GetFontStyle("ContentBrowser.SourceTitleFont") )
 						.Text( this, &SWwisePicker::GetProjectName )
 						.Visibility(InArgs._ShowTreeTitle ? EVisibility::Visible : EVisibility::Collapsed)
 					]
@@ -240,17 +243,27 @@ void SWwisePicker::Construct(const FArguments& InArgs)
 				[
 					SNew(SVerticalBox)
 					+ SVerticalBox::Slot()
-				.VAlign(VAlign_Center)
-				.HAlign(HAlign_Center)
-				.AutoHeight()
-				[
-					SNew(STextBlock)
-					.Visibility(this, &SWwisePicker::isWarningVisible)
-				.AutoWrapText(true)
-				.Justification(ETextJustify::Center)
-				.Text(this, &SWwisePicker::GetWarningText)
-				]
-			+ SVerticalBox::Slot()
+					.VAlign(VAlign_Center)
+					.HAlign(HAlign_Center)
+					.AutoHeight()
+					[
+						SNew(STextBlock)
+						.Visibility(this, &SWwisePicker::isWarningVisible)
+						.AutoWrapText(true)
+						.Justification(ETextJustify::Center)
+						.Text(this, &SWwisePicker::GetWarningText)
+					]
+					+ SVerticalBox::Slot()
+					.VAlign(VAlign_Center)
+					.HAlign(HAlign_Center)
+					.AutoHeight()
+					[
+						SNew(SButton)
+						.Text(LOCTEXT("AkPickerOpenSettings", "Open Wwise Integration Settings"))
+						.Visibility(this, &SWwisePicker::isWarningVisible)
+						.OnClicked(this, &SWwisePicker::OnOpenSettingsClicked)
+					]
+					+ SVerticalBox::Slot()
 				.VAlign(VAlign_Center)
 				.HAlign(HAlign_Center)
 				.AutoHeight()
@@ -286,17 +299,21 @@ void SWwisePicker::InitialParse()
 
 FText SWwisePicker::GetProjectName() const
 {
-	auto* ProjectDatabase = UWwiseProjectDatabase::Get();
+	auto* ProjectDatabase = FWwiseProjectDatabase::Get();
 	if (UNLIKELY(!ProjectDatabase))
 	{
 		return {};
 	}
 
 	const FWwiseDataStructureScopeLock DataStructure(*ProjectDatabase);
-	const auto Platform = DataStructure.GetPlatform(ProjectDatabase->GetCurrentPlatform());
-	if(const auto* ProjectInfo = Platform.ProjectInfo.GetProjectInfo())
+	const FWwiseRefPlatform Platform = DataStructure.GetPlatform(ProjectDatabase->GetCurrentPlatform());
+
+	if (Platform.IsValid())
 	{
-		return FText::FromString(ProjectInfo->Project.Name);
+		if (const auto* ProjectInfo = Platform.ProjectInfo.GetProjectInfo())
+		{
+			return FText::FromName(ProjectInfo->Project.Name);
+		}
 	}
 	return {};
 }
@@ -313,12 +330,25 @@ EVisibility SWwisePicker::isWarningNotVisible() const
 
 FText SWwisePicker::GetWarningText() const
 {
+	if (auto AkSettings = GetMutableDefault<UAkSettings>())
+	{
+		if (AkSettings->GeneratedSoundBanksFolder.Path.IsEmpty())
+		{
+			const FText WarningText = LOCTEXT("PickerSoundBanksFolderEmpty", "Generated SoundBanks Folder in Wwise Integration settings is empty.\nThis folder should match the \"Root Output Path\" in the Wwise Project's SoundBanks settings.");
+			return WarningText;
+		}
+	}
+
 	FString soundBankDirectory = AkUnrealHelper::GetSoundBankDirectory();
-	const FText WarningText = FText::FormatOrdered(LOCTEXT("MissingSoundBanks", "SoundBanks not found at path: {0}. Please make sure this is where Wwise generates them. If they are generated, click Refresh to force a refresh or accept to refresh the project when prompted."), FText::FromString(soundBankDirectory));
-	
+	const FText WarningText = FText::FormatOrdered(LOCTEXT("P{ickerMissingSoundBanks", "SoundBank metadata was not found at path specified by \"Generated SoundBanks Folder\" setting: {0}.\nThis folder should match the \"Root Output Path\" in the Wwise Project's SoundBanks settings.\nEnsure the folders match, and that SoundBanks and JSON metadata are generated.\nPress the \"Refresh\" button to re-parse the generated metadata."), FText::FromString(soundBankDirectory));
 	return WarningText;
 }
 
+FReply SWwisePicker::OnOpenSettingsClicked()
+{
+	FModuleManager::LoadModuleChecked<ISettingsModule>("Settings").ShowViewer(FName("Project"), FName("Wwise"), FName("Integration"));
+	return FReply::Handled();
+}
 FReply SWwisePicker::OnRefreshClicked()
 {
 	if (FModuleManager::Get().IsModuleLoaded("AudiokineticTools"))
@@ -434,59 +464,43 @@ FReply SWwisePicker::DoDragDetected(const FPointerEvent& MouseEvent, const TArra
 	const FString DefaultPath = AkSettings->DefaultAssetCreationPath;
 
 	// bool tracks whether the asset already existed. This is for proper cleanup after the drop operation.
-	TMap<FAssetData, bool> NewAssets;
-	bool bAssetExists;
-	FAssetData AkAsset;
-	TMultiMap<FName, FString> Search;
-	FAssetData SearchResult;
-	for (auto& Item : SelectedItems)
+	TArray<WwisePickerHelpers::WwisePickerAssetPayload> DragAssets;
+	TSet<FGuid> SeenGuids;
+	for (auto& WwiseTreeItem : SelectedItems)
 	{
-		if (!Item->ItemId.IsValid() && !WwisePickerHelpers::IsFolder(Item))
+		if (!WwiseTreeItem->ItemId.IsValid() && !WwisePickerHelpers::IsFolder(WwiseTreeItem))
 		{
-			UE_LOG(LogAudiokineticTools, Error, TEXT("Cannot drag selected Wwise asset: %s does not have a valid ID"), *(Item->FolderPath));
+			UE_LOG(LogAudiokineticTools, Error, TEXT("Cannot drag selected Wwise asset: %s does not have a valid ID"), *(WwiseTreeItem->FolderPath));
 			continue;
 		}
 
-		bAssetExists = false;
-		// If asset exists, then use that, else create a new one
-		if (!AkAssetDatabase::Get().FindFirstAsset(Item->ItemId, SearchResult) || WwisePickerHelpers::IsFolder(Item))
-		{
-			TMap<UObject*, bool> NewWwiseAssets = WwisePickerHelpers::RecurseCreateAssets(Item, DefaultPath, "");
-			if (NewWwiseAssets.Num() == 0)
-			{
-				UE_LOG(LogAudiokineticTools, Error, TEXT("Failed to create new Wwise asset %s from Picker"), *(Item->FolderPath));
-				return FReply::Unhandled();
-			}
-			else
-			{
-				for (const TPair<UObject*, bool> NewAsset : NewWwiseAssets)
-				{
-					AkAsset = FAssetData(NewAsset.Key);
-					NewAssets.Add(AkAsset, NewAsset.Value);
-				}
-			}
-		}
-
-		else
-		{
-			bAssetExists = true;
-			AkAsset = SearchResult;
-			AkAsset.AssetName = FName(Item->DisplayName);
-			AkAsset.PackagePath = "";
-			NewAssets.Add(AkAsset, bAssetExists);
-		}
+		WwisePickerHelpers::FindOrCreateAssetsRecursive(WwiseTreeItem,DragAssets,SeenGuids, WwisePickerHelpers::EAssetCreationMode::Transient);
 	}
 
-	return FReply::Handled().BeginDragDrop(FWwiseAssetDragDropOp::New(NewAssets));
+	if (DragAssets.Num() == 0)
+	{
+		UE_LOG(LogAudiokineticTools, Error, TEXT("Failed to find or create Wwise asset '%s'%s in Picker operation"),
+			*(SelectedItems[0]->FolderPath), SelectedItems.Num() > 1 ? TEXT(" and others"): TEXT(""));
+		return FReply::Unhandled();
+	}
+
+	return FReply::Handled().BeginDragDrop(FWwiseAssetDragDropOp::New(DragAssets));
 }
 
 void SWwisePicker::ImportWwiseAssets(const TArray<TSharedPtr<FWwiseTreeItem>>& SelectedItems, const FString& PackagePath)
 {
 	UE_LOG(LogAudiokineticTools, Verbose, TEXT("SWwisePicker::ImportWwiseAssets: Creating %d assets in %s."), SelectedItems.Num(), *PackagePath);
-	for(auto Asset: SelectedItems)
+	TArray<WwisePickerHelpers::WwisePickerAssetPayload> AssetsToImport;
+	TSet<FGuid> SeenGuids;
+	for(auto WwiseTreeItem: SelectedItems)
 	{
-		WwisePickerHelpers::RecurseCreateAssets(Asset, PackagePath, "");
+		WwisePickerHelpers::FindOrCreateAssetsRecursive(WwiseTreeItem, AssetsToImport, SeenGuids, 
+			WwisePickerHelpers::EAssetCreationMode::InPackage, PackagePath);
+
 	}
+
+	WwisePickerHelpers::SaveSelectedAssets(AssetsToImport, PackagePath, 
+			WwisePickerHelpers::EAssetCreationMode::InPackage, WwisePickerHelpers::EAssetDuplicationMode::DoDuplication);
 }
 
 void SWwisePicker::PopulateSearchStrings(const FString& FolderName, OUT TArray< FString >& OutSearchStrings) const
@@ -619,7 +633,11 @@ void SWwisePicker::HandleImportWwiseItemCommandExecute() const
 				return;
 			}
 			FPaths::MakePathRelativeTo(FolderName, *FPaths::ProjectContentDir());
-			const FString& PackagePath = TEXT("/Game")  / FolderName;
+			FString PackagePath = TEXT("/Game");
+			if (!FolderName.IsEmpty())
+			{
+				PackagePath = PackagePath / FolderName;
+			}
 			FEditorDirectories::Get().SetLastDirectory(ELastDirectory::GENERIC_IMPORT, PackagePath);
 			ImportWwiseAssets(TreeViewPtr->GetSelectedItems(), PackagePath);
 		}

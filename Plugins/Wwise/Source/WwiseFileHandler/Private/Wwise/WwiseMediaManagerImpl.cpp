@@ -1,32 +1,34 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
 Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
 #include "Wwise/WwiseMediaManagerImpl.h"
 #include "Wwise/WwiseMediaFileState.h"
-#include "Wwise/LowLevel/WwiseLowLevelSoundEngine.h"
+#include "Wwise/API/WwiseSoundEngineAPI.h"
 #include "Async/Async.h"
 
-UWwiseMediaManagerImpl::UWwiseMediaManagerImpl()
+FWwiseMediaManagerImpl::FWwiseMediaManagerImpl()
 {
 }
 
-UWwiseMediaManagerImpl::~UWwiseMediaManagerImpl()
+FWwiseMediaManagerImpl::~FWwiseMediaManagerImpl()
 {
 }
 
-void UWwiseMediaManagerImpl::LoadMedia(const FWwiseMediaCookedData& InMediaCookedData, const FString& InRootPath, FLoadMediaCallback&& InCallback)
+void FWwiseMediaManagerImpl::LoadMedia(const FWwiseMediaCookedData& InMediaCookedData, const FString& InRootPath, FLoadMediaCallback&& InCallback)
 {
 	IncrementFileStateUseAsync(InMediaCookedData.MediaId, EWwiseFileStateOperationOrigin::Loading, [this, InMediaCookedData, InRootPath]() mutable
 	{
@@ -37,17 +39,17 @@ void UWwiseMediaManagerImpl::LoadMedia(const FWwiseMediaCookedData& InMediaCooke
 	});
 }
 
-void UWwiseMediaManagerImpl::UnloadMedia(const FWwiseMediaCookedData& InMediaCookedData, const FString& InRootPath, FUnloadMediaCallback&& InCallback)
+void FWwiseMediaManagerImpl::UnloadMedia(const FWwiseMediaCookedData& InMediaCookedData, const FString& InRootPath, FUnloadMediaCallback&& InCallback)
 {
 	DecrementFileStateUseAsync(InMediaCookedData.MediaId, nullptr, EWwiseFileStateOperationOrigin::Loading, MoveTemp(InCallback));
 }
 
-void UWwiseMediaManagerImpl::SetGranularity(AkUInt32 InStreamingGranularity)
+void FWwiseMediaManagerImpl::SetGranularity(AkUInt32 InStreamingGranularity)
 {
 	StreamingGranularity = InStreamingGranularity;
 }
 
-FWwiseFileStateSharedPtr UWwiseMediaManagerImpl::CreateOp(const FWwiseMediaCookedData& InMediaCookedData, const FString& InRootPath)
+FWwiseFileStateSharedPtr FWwiseMediaManagerImpl::CreateOp(const FWwiseMediaCookedData& InMediaCookedData, const FString& InRootPath)
 {
 	if (InMediaCookedData.bStreaming)
 	{

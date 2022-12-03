@@ -122,8 +122,8 @@ namespace PlatformID
 	AK_ID_DECLARE BasePlatformID NintendoNX = BasePlatformID::Create(NintendoNX_unsafeguid);
 
 	// {639AD233-23F2-4c0f-9127-79F44C15E1DA}
-	AK_ID_DECLARE GUID Emscripten_unsafeguid = { 0x639ad233, 0x23f2, 0x4c0f, { 0x91, 0x27, 0x79, 0xf4, 0x4c, 0x15, 0xe1, 0xdA } };
-	AK_ID_DECLARE BasePlatformID Emscripten = BasePlatformID::Create(Emscripten_unsafeguid);
+	AK_ID_DECLARE GUID Web_unsafeguid = { 0x639ad233, 0x23f2, 0x4c0f, { 0x91, 0x27, 0x79, 0xf4, 0x4c, 0x15, 0xe1, 0xdA } };
+	AK_ID_DECLARE BasePlatformID Web = BasePlatformID::Create(Web_unsafeguid);
 
 	//{26352fc0-7716-4f97-8daf-3665ec2bb501}
 	AK_ID_DECLARE GUID XboxSeriesX_unsafeguid = { 0x26352fc0, 0x7716, 0x4f97, { 0x8d, 0xaf, 0x36, 0x65, 0xec, 0x2b, 0xb5, 0x01 } };

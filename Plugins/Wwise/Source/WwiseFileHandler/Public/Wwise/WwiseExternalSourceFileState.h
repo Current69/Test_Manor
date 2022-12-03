@@ -1,15 +1,17 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
 Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
@@ -22,20 +24,21 @@ class WWISEFILEHANDLER_API FWwiseExternalSourceFileState : public FWwiseFileStat
 {
 public:
 	const uint32 MediaId;
-	const FString MediaPathName;
-	const FString RootPath;
+	const FName MediaPathName;
+	const FName RootPath;
 
-	int PlayCount;
+	TAtomic<int> PlayCount;
 
 protected:
-	FWwiseExternalSourceFileState(uint32 InMediaId, const FString& InMediaPathName, const FString& InRootPath, int32 InCodecId);
+	FWwiseExternalSourceFileState(uint32 InMediaId, const FName& InMediaPathName, const FName& InRootPath, int32 InCodecId);
+	~FWwiseExternalSourceFileState() override;
 
 public:
-	bool CanDelete() const override { return FWwiseFileState::CanDelete() && PlayCount == 0; }
+	bool CanDelete() const override { return FWwiseFileState::CanDelete() && PlayCount.Load() == 0; }
 
 	virtual bool GetExternalSourceInfo(AkExternalSourceInfo& OutInfo);
 	void IncrementPlayCount();
-	void DecrementPlayCount();
+	bool DecrementPlayCount();
 
 protected:
 	bool CanUnloadFromSoundEngine() const override { return FWwiseFileState::CanUnloadFromSoundEngine() && PlayCount == 0; }
@@ -55,8 +58,8 @@ public:
 	IMappedFileRegion* MappedRegion;
 
 	FWwiseInMemoryExternalSourceFileState(uint32 InMemoryAlignment, bool bInDeviceMemory, 
-		uint32 InMediaId, const FString& InMediaPathName, const FString& InRootPath, int32 InCodecId);
-	~FWwiseInMemoryExternalSourceFileState() override { FileStateExecutionQueue.Stop(); }
+		uint32 InMediaId, const FName& InMediaPathName, const FName& InRootPath, int32 InCodecId);
+	~FWwiseInMemoryExternalSourceFileState() override { Term(); }
 
 	void OpenFile(FOpenFileCallback&& InCallback) override;
 	void LoadInSoundEngine(FLoadInSoundEngineCallback&& InCallback) override;
@@ -70,11 +73,11 @@ public:
 	const uint32 PrefetchSize;
 	const uint32 StreamingGranularity;
 
-	FArchive* Archive;
+	FWwiseStreamedFile* StreamedFile;
 
 	FWwiseStreamedExternalSourceFileState(uint32 InPrefetchSize, uint32 InStreamingGranularity,
-		uint32 InMediaId, const FString& InMediaPathName, const FString& InRootPath, int32 InCodecId);
-	~FWwiseStreamedExternalSourceFileState() override { FileStateExecutionQueue.Stop(); }
+		uint32 InMediaId, const FName& InMediaPathName, const FName& InRootPath, int32 InCodecId);
+	~FWwiseStreamedExternalSourceFileState() override { Term(); }
 
 	void CloseStreaming() override;
 	FWwiseStreamableFileStateInfo* GetStreamableFileStateInfo() override { return this; }
@@ -82,11 +85,13 @@ public:
 
 	uint32 GetPrefetchSize() const;
 
+	bool CanOpenFile() const override;
 	void OpenFile(FOpenFileCallback&& InCallback) override;
 	void LoadInSoundEngine(FLoadInSoundEngineCallback&& InCallback) override;
 	void UnloadFromSoundEngine(FUnloadFromSoundEngineCallback&& InCallback) override;
 	bool CanCloseFile() const override;
 	void CloseFile(FCloseFileCallback&& InCallback) override;
 
+	bool CanProcessFileOp() const override;
 	AKRESULT ProcessRead(AkFileDesc& InFileDesc, const AkIoHeuristics& InHeuristics, AkAsyncIOTransferInfo& OutTransferInfo, TFileOpDoneCallback&& InFileOpDoneCallback) override;
 };

@@ -522,6 +522,24 @@ namespace AKPLATFORM
 		strncat_s( in_pDest, in_uDestMaxNumChars, in_pSrc, AkMin( iAvailableSize, (int)strlen( in_pSrc ) ) );
 	}
 
+	inline int SafeStrFormat(wchar_t * in_pDest, size_t in_uDestMaxNumChars, const wchar_t* in_pszFmt, ...)
+	{
+		va_list args;
+		va_start(args, in_pszFmt);
+		int r = vswprintf(in_pDest, in_uDestMaxNumChars, in_pszFmt, args);
+		va_end(args);
+		return r;
+	}
+
+	inline int SafeStrFormat(char * in_pDest, size_t in_uDestMaxNumChars, const char* in_pszFmt, ...)
+	{
+		va_list args;
+		va_start(args, in_pszFmt);
+		int r = vsnprintf(in_pDest, in_uDestMaxNumChars, in_pszFmt, args);
+		va_end(args);
+		return r;
+	}
+
 	/// Stack allocations.
 	#define AkAlloca( _size_ ) _alloca( _size_ )
 

@@ -1,15 +1,17 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
 Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
@@ -69,7 +71,7 @@ public:
 	const FWwiseRefSoundBank* GetSoundBankRef() const;
 	const FWwiseRefMedia* GetMediaRef() const;
 	const FWwiseRefCustomPlugin* GetCustomPluginRef() const;
-	const FWwiseRefPluginShareset* GetPluginSharesetRef() const;
+	const FWwiseRefPluginShareSet* GetPluginShareSetRef() const;
 	const FWwiseRefAudioDevice* GetAudioDeviceRef() const;
 	const FWwiseRefEvent* GetEventRef() const;
 	const FWwiseRefSwitchContainer* GetSwitchContainerRef() const;
@@ -93,7 +95,7 @@ public:
 	const FWwiseMetadataSoundBank* GetSoundBank() const;
 	const FWwiseMetadataMedia* GetMedia() const;
 	const FWwiseMetadataPlugin* GetCustomPlugin() const;
-	const FWwiseMetadataPlugin* GetPluginShareset() const;
+	const FWwiseMetadataPlugin* GetPluginShareSet() const;
 	const FWwiseMetadataPlugin* GetAudioDevice() const;
 	const FWwiseMetadataEvent* GetEvent() const;
 	const FWwiseMetadataSwitchContainer* GetSwitchContainer() const;
@@ -116,7 +118,7 @@ public:
 	bool GetRef(FWwiseRefSoundBank& OutRef) const;
 	bool GetRef(FWwiseRefMedia& OutRef) const;
 	bool GetRef(FWwiseRefCustomPlugin& OutRef) const;
-	bool GetRef(FWwiseRefPluginShareset& OutRef) const;
+	bool GetRef(FWwiseRefPluginShareSet& OutRef) const;
 	bool GetRef(FWwiseRefAudioDevice& OutRef) const;
 	bool GetRef(FWwiseRefEvent& OutRef) const;
 	bool GetRef(FWwiseRefSwitchContainer& OutRef) const;
@@ -136,8 +138,8 @@ public:
 	FGuid GetGuid(const EWwiseRefType* TypeOverride = nullptr) const;
 	uint32 GetGroupId(const EWwiseRefType* TypeOverride = nullptr) const;
 	uint32 GetId(const EWwiseRefType* TypeOverride = nullptr) const;
-	FString GetName(const EWwiseRefType* TypeOverride = nullptr) const;
-	FString GetObjectPath(const EWwiseRefType* TypeOverride = nullptr) const;
+	FName GetName(const EWwiseRefType* TypeOverride = nullptr) const;
+	FName GetObjectPath(const EWwiseRefType* TypeOverride = nullptr) const;
 
 	bool operator ==(const FWwiseAnyRef& Rhs) const
 	{

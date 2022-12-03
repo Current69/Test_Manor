@@ -170,7 +170,7 @@ public:
 
     AkUInt32 GetNbWritableItems() const
     {
-        return m_nbItems - m_nbReadableItems;
+        return m_nbItems - (AkUInt32)m_nbReadableItems;
     }
 
     AkUInt32 Size() const
@@ -201,7 +201,7 @@ public:
                 {
                     // insert new free space at the end of the buffer.
 
-                    memcpy(pNewData + m_readIndex, m_data + m_readIndex, sizeof(T) * m_nbReadableItems);
+                    memcpy(pNewData + m_readIndex, m_data + m_readIndex, sizeof(T) * (AkUInt32)m_nbReadableItems);
                 }
             }
 

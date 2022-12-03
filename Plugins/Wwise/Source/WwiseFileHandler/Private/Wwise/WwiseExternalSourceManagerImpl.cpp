@@ -1,24 +1,28 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
 Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
 #include "Wwise/WwiseExternalSourceManagerImpl.h"
-#include "Wwise/LowLevel/WwiseLowLevelSoundEngine.h"
+#include "Wwise/API/WwiseSoundEngineAPI.h"
 #include "Wwise/Stats/AsyncStats.h"
 #include "Wwise/Stats/FileHandler.h"
 
 #include <inttypes.h>
+
+#include "Wwise/WwiseExternalSourceFileState.h"
 
 FWwiseExternalSourceState::FWwiseExternalSourceState(const FWwiseExternalSourceCookedData& InCookedData) :
 	FWwiseExternalSourceCookedData(InCookedData),
@@ -34,36 +38,37 @@ FWwiseExternalSourceState::~FWwiseExternalSourceState()
 
 void FWwiseExternalSourceState::IncrementLoadCount()
 {
-	++LoadCount;
-	UE_LOG(LogWwiseFileHandler, VeryVerbose, TEXT("ExternalSource State %" PRIu32 " (%s): ++LoadCount=%d"), Cookie, *DebugName, LoadCount);
+	const auto NewLoadCount = LoadCount.IncrementExchange() + 1;
+	UE_LOG(LogWwiseFileHandler, VeryVerbose, TEXT("ExternalSource State %" PRIu32 " (%s): ++LoadCount=%d"), Cookie, *DebugName.ToString(), NewLoadCount);
 }
 
 bool FWwiseExternalSourceState::DecrementLoadCount()
 {
-	const bool bResult = --LoadCount == 0;
+	const auto NewLoadCount = LoadCount.DecrementExchange() - 1;
+	const bool bResult = (NewLoadCount == 0);
 	if (bResult)
 	{
-		UE_LOG(LogWwiseFileHandler, VeryVerbose, TEXT("ExternalSource State %" PRIu32 " (%s): --LoadCount=%d. Deleting."), Cookie, *DebugName, LoadCount);
+		UE_LOG(LogWwiseFileHandler, VeryVerbose, TEXT("ExternalSource State %" PRIu32 " (%s): --LoadCount=%d. Deleting."), Cookie, *DebugName.ToString(), NewLoadCount);
 	}
 	else
 	{
-		UE_LOG(LogWwiseFileHandler, VeryVerbose, TEXT("ExternalSource State %" PRIu32 " (%s): --LoadCount=%d"), Cookie, *DebugName, LoadCount);
+		UE_LOG(LogWwiseFileHandler, VeryVerbose, TEXT("ExternalSource State %" PRIu32 " (%s): --LoadCount=%d"), Cookie, *DebugName.ToString(), NewLoadCount);
 	}
 	return bResult;
 }
 
 
-UWwiseExternalSourceManagerImpl::UWwiseExternalSourceManagerImpl() :
+FWwiseExternalSourceManagerImpl::FWwiseExternalSourceManagerImpl() :
 	StreamingGranularity(0)
 {
 }
 
-UWwiseExternalSourceManagerImpl::~UWwiseExternalSourceManagerImpl()
+FWwiseExternalSourceManagerImpl::~FWwiseExternalSourceManagerImpl()
 {
 }
 
-void UWwiseExternalSourceManagerImpl::LoadExternalSource(
-	const FWwiseExternalSourceCookedData& InExternalSourceCookedData, const FString& InRootPath,
+void FWwiseExternalSourceManagerImpl::LoadExternalSource(
+	const FWwiseExternalSourceCookedData& InExternalSourceCookedData, const FName& InRootPath,
 	const FWwiseLanguageCookedData& InLanguage, FLoadExternalSourceCallback&& InCallback)
 {
 	FileHandlerExecutionQueue.Async([this, InExternalSourceCookedData, InRootPath, InLanguage, InCallback = MoveTemp(InCallback)]() mutable
@@ -72,8 +77,8 @@ void UWwiseExternalSourceManagerImpl::LoadExternalSource(
 	});
 }
 
-void UWwiseExternalSourceManagerImpl::UnloadExternalSource(
-	const FWwiseExternalSourceCookedData& InExternalSourceCookedData, const FString& InRootPath,
+void FWwiseExternalSourceManagerImpl::UnloadExternalSource(
+	const FWwiseExternalSourceCookedData& InExternalSourceCookedData, const FName& InRootPath,
 	const FWwiseLanguageCookedData& InLanguage, FUnloadExternalSourceCallback&& InCallback)
 {
 	FileHandlerExecutionQueue.Async([this, InExternalSourceCookedData, InRootPath, InLanguage, InCallback = MoveTemp(InCallback)]() mutable
@@ -82,101 +87,55 @@ void UWwiseExternalSourceManagerImpl::UnloadExternalSource(
 	});
 }
 
-void UWwiseExternalSourceManagerImpl::SetGranularity(AkUInt32 InStreamingGranularity)
+void FWwiseExternalSourceManagerImpl::SetGranularity(AkUInt32 InStreamingGranularity)
 {
 	StreamingGranularity = InStreamingGranularity;
 }
 
-bool UWwiseExternalSourceManagerImpl::GetExternalSourceInfo(AkExternalSourceInfo& OutInfo, const FWwiseExternalSourceCookedData& InCookedData)
+TArray<uint32> FWwiseExternalSourceManagerImpl::PrepareExternalSourceInfos(TArray<AkExternalSourceInfo>& OutInfo,
+                                                                           const TArray<FWwiseExternalSourceCookedData>
+                                                                           &&
+                                                                           InCookedData)
 {
-	return GetExternalSourceInfo(OutInfo, InCookedData.Cookie, InCookedData.DebugName);
-}
-
-bool UWwiseExternalSourceManagerImpl::GetExternalSourceInfo(AkExternalSourceInfo& OutInfo, const uint32 InExternalSourceCookie, const FString& InExternalSourceName)
-{
-	bool bResult = true;
-	FileHandlerExecutionQueue.AsyncWait([this, &bResult, &OutInfo, InExternalSourceCookie, InExternalSourceName]() mutable
+	if (InCookedData.Num() == 0)
 	{
-		bResult = GetExternalSourceInfoImpl(OutInfo, InExternalSourceCookie, InExternalSourceName);
-	});
-	return bResult;
-}
-
-bool UWwiseExternalSourceManagerImpl::GetExternalSourceInfos(TArray<AkExternalSourceInfo>& OutInfo, const TArray<uint32>& InExternalSourceCookies, const TArray<FString>& InExternalSourceNames)
-{
-	bool bResult = true;
-
-	if (InExternalSourceCookies.Num() > 0)
-		FileHandlerExecutionQueue.AsyncWait([this, &bResult, &OutInfo, &InExternalSourceCookies, &InExternalSourceNames]() mutable
-	{
-		OutInfo.Reset(InExternalSourceCookies.Num());
-		for (int i = 0; i < InExternalSourceCookies.Num(); i++)
-		{
-			const auto& ExternalSourceCookie = InExternalSourceCookies[i];
-			const FString ExternalSourceName = InExternalSourceNames.Num() >=i ? InExternalSourceNames[i] : TEXT("Unknown");
-			AkExternalSourceInfo Info;
-			if (LIKELY(GetExternalSourceInfoImpl(Info, ExternalSourceCookie, ExternalSourceName)))
-			{
-				//Set the Cookie here (because the ext src media state can't definitively know the cookie)
-				auto InfoCopy = MoveTemp(Info);
-				InfoCopy.iExternalSrcCookie = ExternalSourceCookie;
-				OutInfo.Add(InfoCopy);  
-			}
-			else
-			{
-				bResult = false;
-			}
-		}
-
-		if (UNLIKELY(!bResult))
-		{
-			if (OutInfo.Num() > 0)
-			{
-				UE_LOG(LogWwiseFileHandler, Log, TEXT("GetExternalSourceInfos: Partially successful (%d expected %d)."), OutInfo.Num(), InExternalSourceCookies.Num());
-				bResult = true;
-			}
-			else
-			{
-				UE_LOG(LogWwiseFileHandler, Log, TEXT("GetExternalSourceInfos: Unsuccessful."));
-			}
-		}
-		else
-		{
-			UE_LOG(LogWwiseFileHandler, VeryVerbose, TEXT("GetExternalSourceInfos: Successfuly retrieved requested %d external sources."), OutInfo.Num());
-		}
-	});
-	return bResult;
-}
-
-bool UWwiseExternalSourceManagerImpl::GetExternalSourceInfos(TArray<AkExternalSourceInfo>& OutInfo,
-	const TArray<FWwiseExternalSourceCookedData>& InCookedData)
-{
-	TArray<uint32> ExternalSourceCookies;
-	TArray<FString> ExternalSourceNames;
-
-	bool bSuccess = true;
-
-	OutInfo.Reset(InCookedData.Num());
-	for (const auto& CookedData : InCookedData)
-	{
-		ExternalSourceCookies.Add(CookedData.Cookie);
-		ExternalSourceNames.Add(CookedData.DebugName);
+		UE_LOG(LogWwiseFileHandler, VeryVerbose, TEXT("PrepareExternalSourceInfos: No External Sources to process"));
+		return {};
 	}
 
-	return GetExternalSourceInfos(OutInfo, ExternalSourceCookies, ExternalSourceNames);
+	UE_LOG(LogWwiseFileHandler, VeryVerbose, TEXT("GetExternalSourceInfos: Preparing %d external sources."), InCookedData.Num());
+	TArray<uint32> Result;
+	OutInfo.Reset();
+	OutInfo.Reserve(InCookedData.Num());
+	Result.Reserve(InCookedData.Num());
+	{
+		FRWScopeLock Lock(CookieToMediaLock, FRWScopeLockType::SLT_ReadOnly);
+		for (const auto& Data : InCookedData)
+		{
+			AkExternalSourceInfo Info;
+			const auto MediaId = PrepareExternalSourceInfo(Info, Data);
+			if (LIKELY(MediaId != AK_INVALID_UNIQUE_ID))
+			{
+				OutInfo.Add(MoveTemp(Info));
+				Result.Add(MediaId);
+			}
+		}
+	}
+	UE_LOG(LogWwiseFileHandler, VeryVerbose, TEXT("GetExternalSourceInfos: Successfuly retrieved requested %d of %d external sources."), OutInfo.Num(), InCookedData.Num());
+	return Result;
 }
 
 #if WITH_EDITORONLY_DATA
-void UWwiseExternalSourceManagerImpl::Cook(UWwiseResourceCooker& InResourceCooker, const FWwiseExternalSourceCookedData& InCookedData,
+void FWwiseExternalSourceManagerImpl::Cook(FWwiseResourceCooker& InResourceCooker, const FWwiseExternalSourceCookedData& InCookedData,
 	TFunctionRef<void(const TCHAR* Filename, void* Data, int64 Size)> WriteAdditionalFile,
 	const FWwiseSharedPlatformId& InPlatform, const FWwiseSharedLanguageId& InLanguage)
 {
-	UE_LOG(LogWwiseFileHandler, Error, TEXT("UWwiseExternalSourceManagerImpl::Cook: External Source manager needs to be overridden."));
+	UE_LOG(LogWwiseFileHandler, Error, TEXT("FWwiseExternalSourceManagerImpl::Cook: External Source manager needs to be overridden."));
 }
 #endif
 
-void UWwiseExternalSourceManagerImpl::LoadExternalSourceImpl(
-	const FWwiseExternalSourceCookedData& InExternalSourceCookedData, const FString& InRootPath, const FWwiseLanguageCookedData& InLanguage,
+void FWwiseExternalSourceManagerImpl::LoadExternalSourceImpl(
+	const FWwiseExternalSourceCookedData& InExternalSourceCookedData, const FName& InRootPath, const FWwiseLanguageCookedData& InLanguage,
 	FLoadExternalSourceCallback&& InCallback)
 {
 	FWwiseExternalSourceStateSharedPtr State;
@@ -203,8 +162,8 @@ void UWwiseExternalSourceManagerImpl::LoadExternalSourceImpl(
 	LoadExternalSourceMedia(InExternalSourceCookedData.Cookie, InExternalSourceCookedData.DebugName, InRootPath, MoveTemp(InCallback));
 }
 
-void UWwiseExternalSourceManagerImpl::UnloadExternalSourceImpl(
-	const FWwiseExternalSourceCookedData& InExternalSourceCookedData, const FString& InRootPath, const FWwiseLanguageCookedData& InLanguage,
+void FWwiseExternalSourceManagerImpl::UnloadExternalSourceImpl(
+	const FWwiseExternalSourceCookedData& InExternalSourceCookedData, const FName& InRootPath, const FWwiseLanguageCookedData& InLanguage,
 	FUnloadExternalSourceCallback&& InCallback)
 {
 	FWwiseExternalSourceStateSharedPtr State;
@@ -215,13 +174,13 @@ void UWwiseExternalSourceManagerImpl::UnloadExternalSourceImpl(
 
 	if (UNLIKELY(!State.IsValid()))
 	{
-		UE_LOG(LogWwiseFileHandler, Error, TEXT("ExternalSource %" PRIu32 " (%s): Unloading an unknown External Source"), InExternalSourceCookedData.Cookie, *InExternalSourceCookedData.DebugName);
+		UE_LOG(LogWwiseFileHandler, Error, TEXT("ExternalSource %" PRIu32 " (%s): Unloading an unknown External Source"), InExternalSourceCookedData.Cookie, *InExternalSourceCookedData.DebugName.ToString());
 		InCallback();
 	}
 	else
 	{
 		FWwiseExternalSourceState* ExternalSourceState = State.Get();
-		UE_LOG(LogWwiseFileHandler, VeryVerbose, TEXT("ExternalSource %" PRIu32 " (%s): Closing State instance"), InExternalSourceCookedData.Cookie, *InExternalSourceCookedData.DebugName);
+		UE_LOG(LogWwiseFileHandler, VeryVerbose, TEXT("ExternalSource %" PRIu32 " (%s): Closing State instance"), InExternalSourceCookedData.Cookie, *InExternalSourceCookedData.DebugName.ToString());
 		if (CloseExternalSourceState(*State) && InExternalSourceCookedData.Cookie != 0)
 		{
 			ExternalSourceStatesById.Remove(InExternalSourceCookedData.Cookie);
@@ -238,48 +197,190 @@ void UWwiseExternalSourceManagerImpl::UnloadExternalSourceImpl(
 	}
 }
 
-FWwiseExternalSourceStateSharedPtr UWwiseExternalSourceManagerImpl::CreateExternalSourceState(
-	const FWwiseExternalSourceCookedData& InExternalSourceCookedData, const FString& InRootPath)
+FWwiseExternalSourceStateSharedPtr FWwiseExternalSourceManagerImpl::CreateExternalSourceState(
+	const FWwiseExternalSourceCookedData& InExternalSourceCookedData, const FName& InRootPath)
 {
 	return FWwiseExternalSourceStateSharedPtr(new FWwiseExternalSourceState(InExternalSourceCookedData));
 }
 
-bool UWwiseExternalSourceManagerImpl::CloseExternalSourceState(FWwiseExternalSourceState& InExternalSourceState)
+bool FWwiseExternalSourceManagerImpl::CloseExternalSourceState(FWwiseExternalSourceState& InExternalSourceState)
 {
 	return InExternalSourceState.DecrementLoadCount();
 }
 
 
-void UWwiseExternalSourceManagerImpl::LoadExternalSourceMedia(const uint32 InExternalSourceCookie,
-	const FString& InExternalSourceName, const FString& InRootPath, FLoadExternalSourceCallback&& InCallback)
+void FWwiseExternalSourceManagerImpl::LoadExternalSourceMedia(const uint32 InExternalSourceCookie,
+	const FName& InExternalSourceName, const FName& InRootPath, FLoadExternalSourceCallback&& InCallback)
 {
 	UE_LOG(LogWwiseFileHandler, Error, TEXT("External Source manager needs to be overridden."));
 	InCallback(false);
 }
 
-void UWwiseExternalSourceManagerImpl::UnloadExternalSourceMedia(const uint32 InExternalSourceCookie,
-	const FString& InExternalSourceName, const FString& InRootPath, FUnloadExternalSourceCallback&& InCallback)
+void FWwiseExternalSourceManagerImpl::UnloadExternalSourceMedia(const uint32 InExternalSourceCookie,
+	const FName& InExternalSourceName, const FName& InRootPath, FUnloadExternalSourceCallback&& InCallback)
 {
 	UE_LOG(LogWwiseFileHandler, Error, TEXT("External Source manager needs to be overridden."));
 	InCallback();
 }
 
-bool UWwiseExternalSourceManagerImpl::GetExternalSourceInfoImpl(AkExternalSourceInfo& OutInfo,
-	uint32 InExternalSourceCookie, const FString& ExternalSourceName)
+uint32 FWwiseExternalSourceManagerImpl::PrepareExternalSourceInfo(AkExternalSourceInfo& OutInfo,
+                                                                  const FWwiseExternalSourceCookedData& InCookedData)
 {
-	UE_LOG(LogWwiseFileHandler, Error, TEXT("External Source manager needs to be overridden."));
-	return false;
+	const auto* ExternalSourceFileStatePtr = CookieToMedia.Find(InCookedData.Cookie);
+	if (UNLIKELY(!ExternalSourceFileStatePtr))
+	{
+		UE_LOG(LogWwiseFileHandler, Warning, TEXT("PrepareExternalSourceInfo %" PRIu32 " (%s): CookieToMedia not defined"), InCookedData.Cookie, *InCookedData.DebugName.ToString());
+		return AK_INVALID_UNIQUE_ID;
+	}
+	auto* ExternalSourceFileState = *ExternalSourceFileStatePtr;
+
+	if (UNLIKELY(!ExternalSourceFileState->GetExternalSourceInfo(OutInfo)))
+	{
+		UE_LOG(LogWwiseFileHandler, Log, TEXT("Getting external source %" PRIu32 " (%s): AkExternalSourceInfo not initialized"), InCookedData.Cookie, *InCookedData.DebugName.ToString());
+		return AK_INVALID_UNIQUE_ID;
+	}
+
+	ExternalSourceFileState->IncrementPlayCount();
+
+	OutInfo.iExternalSrcCookie = InCookedData.Cookie;
+	UE_CLOG(OutInfo.idFile != 0, LogWwiseFileHandler, VeryVerbose, TEXT("Getting external source %" PRIu32 " (%s): Using file %" PRIu32), InCookedData.Cookie, *InCookedData.DebugName.ToString(), OutInfo.idFile);
+	UE_CLOG(OutInfo.idFile == 0, LogWwiseFileHandler, VeryVerbose, TEXT("Getting external source %" PRIu32 " (%s): Using memory file"), InCookedData.Cookie, *InCookedData.DebugName.ToString());
+	return ExternalSourceFileState->MediaId;
 }
 
-void UWwiseExternalSourceManagerImpl::OnPostEvent(const uint32 InPlayingID,
-                                                  const TArray<AkExternalSourceInfo>& InExternalSources)
+void FWwiseExternalSourceManagerImpl::BindPlayingIdToExternalSources(const uint32 InPlayingId,
+                                                                     const TArray<uint32>& InMediaIds)
+{
+	if (InMediaIds.Num() == 0)
+	{
+		return;
+	}
+
+	if (UNLIKELY(InPlayingId == AK_INVALID_PLAYING_ID))
+	{
+		UE_LOG(LogWwiseFileHandler, VeryVerbose, TEXT("BindPlayingIdToExternalSources: Failed PostEvent. Unpreparing %d Media."), InMediaIds.Num());
+
+		FRWScopeLock Lock(CookieToMediaLock, FRWScopeLockType::SLT_ReadOnly);
+		for (const auto MediaId : InMediaIds)
+		{
+			FWwiseFileStateSharedPtr State;
+			{
+				FRWScopeLock StateLock(FileStatesByIdLock, FRWScopeLockType::SLT_ReadOnly);
+				const auto* StatePtr = FileStatesById.Find(MediaId);
+				if (UNLIKELY(!StatePtr || !StatePtr->IsValid()))
+				{
+					UE_LOG(LogWwiseFileHandler, Warning, TEXT("BindPlayingIdToExternalSources: Getting external source media state %" PRIu32 " failed to decrement after failed PostEvent."), MediaId);
+					continue;
+				}
+				State = *StatePtr;
+			}
+			auto* ExternalSourceFileState = State->GetStateAs<FWwiseExternalSourceFileState>();
+			if (UNLIKELY(!ExternalSourceFileState))
+			{
+				UE_LOG(LogWwiseFileHandler, Error, TEXT("BindPlayingIdToExternalSources: Getting external source media %" PRIu32 ": Could not cast to ExternalSourceState"), MediaId);
+				continue;
+			}
+
+			FileHandlerExecutionQueue.Async([this, MediaId, ExternalSourceFileState]() mutable
+			{
+				// This type is safe as long as we don't decrement its usage
+				if (ExternalSourceFileState->DecrementPlayCount() && ExternalSourceFileState->CanDelete())
+				{
+					OnDeleteState(MediaId, *ExternalSourceFileState, EWwiseFileStateOperationOrigin::Loading, []{});
+				}
+			});
+		}
+	}
+	else
+	{
+		UE_LOG(LogWwiseFileHandler, VeryVerbose, TEXT("BindPlayingIdToExternalSources: Binding %d ExtSrc Media to Playing ID %" PRIu32 "."), InMediaIds.Num(), InPlayingId);
+		for (const auto MediaId : InMediaIds)
+		{
+			PlayingIdToMediaIds.AddUnique(InPlayingId, MediaId);
+		}
+	}
+}
+
+void FWwiseExternalSourceManagerImpl::OnEndOfEvent(const uint32 InPlayingId)
+{
+	if (!PlayingIdToMediaIds.Contains(InPlayingId))
+	{
+		return;
+	}
+
+	TArray<uint32> MediaIds;
+	PlayingIdToMediaIds.MultiFind(InPlayingId, MediaIds);
+	PlayingIdToMediaIds.Remove(InPlayingId);
+	UE_LOG(LogWwiseFileHandler, VeryVerbose, TEXT("OnEndOfEvent: Unbinding %d ExtSrc Media from Playing ID %" PRIu32 "."), MediaIds.Num(), InPlayingId);
+
+	FRWScopeLock Lock(CookieToMediaLock, FRWScopeLockType::SLT_ReadOnly);
+
+	for (const auto MediaId : MediaIds)
+	{
+		FWwiseFileStateSharedPtr State;
+		{
+			FRWScopeLock StateLock(FileStatesByIdLock, FRWScopeLockType::SLT_ReadOnly);
+			const auto* StatePtr = FileStatesById.Find(MediaId);
+			if (UNLIKELY(!StatePtr || !StatePtr->IsValid()))
+			{
+				UE_LOG(LogWwiseFileHandler, Warning, TEXT("OnEndOfEvent: Getting external source media state %" PRIu32 " failed to decrement after failed PostEvent."), MediaId);
+				continue;
+			}
+			State = *StatePtr;
+		}
+		auto* ExternalSourceFileState = State->GetStateAs<FWwiseExternalSourceFileState>();
+		if (UNLIKELY(!ExternalSourceFileState))
+		{
+			UE_LOG(LogWwiseFileHandler, Error, TEXT("OnEndOfEvent: Getting external source media %" PRIu32 ": Could not cast to ExternalSourceState"), MediaId);
+			continue;
+		}
+		FileHandlerExecutionQueue.Async([this, MediaId, ExternalSourceFileState]() mutable
+		{
+			// This type is safe as long as we don't decrement its usage
+			if (ExternalSourceFileState->DecrementPlayCount() && ExternalSourceFileState->CanDelete())
+			{
+				OnDeleteState(MediaId, *ExternalSourceFileState, EWwiseFileStateOperationOrigin::Loading, []{});
+			}
+		});
+	}
+}
+
+void FWwiseExternalSourceManagerImpl::OnDeleteState(uint32 InShortId, FWwiseFileState& InFileState,
+	EWwiseFileStateOperationOrigin InOperationOrigin, FDecrementStateCallback&& InCallback)
+{
+	if (InFileState.CanDelete())
+	{
+		FRWScopeLock Lock(CookieToMediaLock, FRWScopeLockType::SLT_Write);
+		TArray<uint32> CookiesToRemove;
+		for (const auto Item : CookieToMedia)
+		{
+			if (Item.Value == &InFileState)
+			{
+				CookiesToRemove.Add(Item.Key);
+			}
+		}
+		for (const auto Cookie : CookiesToRemove)
+		{
+			UE_LOG(LogWwiseFileHandler, Verbose, TEXT("Removing Cookie %" PRIu32 " binding to media %" PRIu32 "."), Cookie, InFileState.GetShortId());
+			CookieToMedia.Remove(Cookie);
+		}
+	}
+	FWwiseFileHandlerBase::OnDeleteState(InShortId, InFileState, InOperationOrigin, MoveTemp(InCallback));
+}
+
+void FWwiseExternalSourceManagerImpl::SetExternalSourceMediaById(const FName& ExternalSourceName, const int32 MediaId)
 {
 	UE_LOG(LogWwiseFileHandler, Error, TEXT("External Source manager needs to be overridden."));
 }
 
-void UWwiseExternalSourceManagerImpl::OnEndOfEvent(const uint32 InPlayingID)
+void FWwiseExternalSourceManagerImpl::SetExternalSourceMediaByName(const FName& ExternalSourceName,
+	const FName& MediaName)
 {
 	UE_LOG(LogWwiseFileHandler, Error, TEXT("External Source manager needs to be overridden."));
 }
 
-
+void FWwiseExternalSourceManagerImpl::SetExternalSourceMediaWithIds(const int32 ExternalSourceCookie,
+	const int32 MediaId)
+{
+	UE_LOG(LogWwiseFileHandler, Error, TEXT("External Source manager needs to be overridden."));
+}

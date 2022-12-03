@@ -1,16 +1,18 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
-Copyright (c) 2021 Audiokinetic Inc.
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
+Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
 #pragma once
@@ -59,34 +61,25 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category = "WAAPI")
 	bool AutoSyncSelection = true;
 
-	//Synchronize name changes made in the Wwise project over WAAPI (will only make changes when both projects are open)
-	UPROPERTY(Config, EditAnywhere, Category = "WAAPI")
-	bool bAutoSyncWwiseAssetNames = false;
-
-	// Time out value for the xml error message translator to translate an error message (in ms). If set to 0, disable the translator entirely
-	UPROPERTY(Config, EditAnywhere, Category = "Error Message Translator")
-	uint32 XmlTranslatorTimeout = 10;
-
 	// Time out value for the waapi error message translator to translate an error message (in ms). If set to 0, disable the translator entirely
 	UPROPERTY(Config, EditAnywhere, Category = "Error Message Translator")
 	uint32 WaapiTranslatorTimeout = 0;
 
 	UPROPERTY(Config)
-	bool SuppressWwiseProjectPathWarnings = false;
+	bool SuppressGeneratedSoundBanksPathWarnings = false;
 
 	UPROPERTY(Config)
 	bool SoundDataGenerationSkipLanguage = false;
 
 	//Will open a notification that must be accepted before reloading Wwise Asset Data
-	UPROPERTY(Config, EditAnywhere, Category = "Assets Reload")
-	bool AskForWwiseAssetsReload = false;
+	UPROPERTY(Config, EditAnywhere, Category = "Asset Reload")
+	bool AskForWwiseAssetReload = false;
 
 
 #if WITH_EDITOR
 
-	public:
+public:
 	mutable AutoConnectChanged OnAutoConnectToWaapiChanged;
-	mutable AutoSyncWaapiNamesChanged OnAutoSyncWwiseAssetNamesChanged;
 
 	FOnSoundBanksPathChangedDelegate OnGeneratedSoundBanksPathChanged;
 protected:

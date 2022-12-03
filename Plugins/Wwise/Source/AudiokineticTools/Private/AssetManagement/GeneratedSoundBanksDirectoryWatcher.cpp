@@ -1,3 +1,20 @@
+/*******************************************************************************
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
+Copyright (c) 2022 Audiokinetic Inc.
+*******************************************************************************/
+
 #include "AssetManagement/GeneratedSoundBanksDirectoryWatcher.h"
 
 #include "AkAudioModule.h"
@@ -15,7 +32,6 @@
 #include "Wwise/WwiseSoundEngineModule.h"
 #include "Wwise/Metadata/WwiseMetadataProjectInfo.h"
 
-
 #define LOCTEXT_NAMESPACE "AkAudio"
 
 
@@ -26,7 +42,7 @@ bool GeneratedSoundBanksDirectoryWatcher::DoesWwiseProjectExist()
 
 void GeneratedSoundBanksDirectoryWatcher::CheckIfCachePathChanged()
 {
-	auto* ProjectDatabase = UWwiseProjectDatabase::Get();
+	auto* ProjectDatabase = FWwiseProjectDatabase::Get();
 	if (UNLIKELY(!ProjectDatabase) || IWwiseProjectDatabaseModule::IsInACookingCommandlet())
 	{
 		return;
@@ -36,10 +52,10 @@ void GeneratedSoundBanksDirectoryWatcher::CheckIfCachePathChanged()
 	const FWwiseRefPlatform Platform = DataStructure.GetPlatform(ProjectDatabase->GetCurrentPlatform());
 	if (auto* ProjectInfo = Platform.ProjectInfo.GetProjectInfo())
 	{
-		const FString SourceCachePath = AkUnrealHelper::GetSoundBankDirectory() / ProjectInfo->CacheRoot;
+		const FString SourceCachePath = AkUnrealHelper::GetSoundBankDirectory() / ProjectInfo->CacheRoot.ToString();
 		if (SourceCachePath != CachePath || !CacheChangedHandle.IsValid())
 		{
-			UE_LOG(LogAudiokineticTools, Verbose, TEXT("GeneratedSoundBanksDirectoryWatcher::CheckIfCachePathChanged : Cache path changed, restarting cache watcher."));
+			UE_LOG(LogAudiokineticTools, Verbose, TEXT("GeneratedSoundBanksDirectoryWatcher::CheckIfCachePathChanged: Cache path changed, restarting cache watcher."));
 
 			StopCacheWatcher();
 			StartCacheWatcher(SourceCachePath);
@@ -90,18 +106,25 @@ void GeneratedSoundBanksDirectoryWatcher::StartWatchers()
 	// If there is a wwise project, we also watch the cache root file which notifies us when bank generation is done
 	if (DoesWwiseProjectExist())
 	{
-		auto* ProjectDatabase = UWwiseProjectDatabase::Get();
+		auto* ProjectDatabase = FWwiseProjectDatabase::Get();
 		if (UNLIKELY(!ProjectDatabase))
 		{
-			UE_LOG(LogAudiokineticTools, Warning, TEXT("GeneratedSoundBanksDirectoryWatcher::Initialize : Could not get WwiseProjectDataEditor. DirectoryWatcher will not be initialized"));
+			UE_LOG(LogAudiokineticTools, Warning, TEXT("GeneratedSoundBanksDirectoryWatcher::StartWatchers: Could not get WwiseProjectDatabase. Wwise Cache watcher will not be initialized"));
 			return;
 		}
 		const FWwiseDataStructureScopeLock DataStructure(*ProjectDatabase);
 		const FWwiseRefPlatform Platform = DataStructure.GetPlatform(ProjectDatabase->GetCurrentPlatform());
-		if (auto* ProjectInfo = Platform.ProjectInfo.GetProjectInfo())
+		if (Platform.IsValid())
 		{
-			const FString SourceCachePath = AkUnrealHelper::GetSoundBankDirectory() / ProjectInfo->CacheRoot;
-			StartCacheWatcher(SourceCachePath);
+			if (auto* ProjectInfo = Platform.ProjectInfo.GetProjectInfo())
+			{
+				const FString SourceCachePath = AkUnrealHelper::GetSoundBankDirectory() / ProjectInfo->CacheRoot.ToString();
+				StartCacheWatcher(SourceCachePath);
+			}
+		}
+		else
+		{
+			UE_LOG(LogAudiokineticTools, Warning, TEXT("GeneratedSoundBanksDirectoryWatcher::StartWatchers: Could not get Project Info for current platform from WwiseProjectDatabase. Wwise Cache watcher will not be initialized"));
 		}
 	}
 }
@@ -115,15 +138,15 @@ bool GeneratedSoundBanksDirectoryWatcher::StartCacheWatcher(const FString& InCac
 
 	if (!FPaths::DirectoryExists(InCachePath))
 	{
-		UE_LOG(LogAudiokineticTools, Warning, TEXT("GeneratedSoundBanksDirectoryWatcher::StartCacheWatcher : Cache directory to watch does not exist %s"), *CachePath);
+		UE_LOG(LogAudiokineticTools, Log, TEXT("GeneratedSoundBanksDirectoryWatcher::StartCacheWatcher: Cache directory to watch does not exist %s"), *InCachePath);
 		bCacheFolderExists = false;
 		return false;
 	}
 
 	bCacheFolderExists = true;
-	UE_LOG(LogAudiokineticTools, Verbose, TEXT("GeneratedSoundBanksDirectoryWatcher::StartCacheWatcher : Starting cache watcher - %s."), *CachePath);
-
 	CachePath = InCachePath;
+	UE_LOG(LogAudiokineticTools, Verbose, TEXT("GeneratedSoundBanksDirectoryWatcher::StartCacheWatcher: Starting cache watcher - %s."), *CachePath);
+
 	auto& DirectoryWatcherModule = FModuleManager::LoadModuleChecked<FDirectoryWatcherModule>(TEXT("DirectoryWatcher"));
 	return DirectoryWatcherModule.Get()->RegisterDirectoryChangedCallback_Handle(
 		CachePath
@@ -142,13 +165,13 @@ void GeneratedSoundBanksDirectoryWatcher::StartSoundBanksWatcher(const FString& 
 
 	if (!FPaths::DirectoryExists(GeneratedSoundBanksFolder))
 	{
-		UE_LOG(LogAudiokineticTools, Warning, TEXT("Generated Soundbanks Folder %s to watch not found. Make sure the Generated SoundBanks Folder is correct and make sure the SoundBanks are generated then press the Populate button in the Wwise Picker"), *CachePath);
+		UE_LOG(LogAudiokineticTools, Warning, TEXT("GeneratedSoundBanksDirectoryWatcher::StartSoundBanksWatcher: Generated Soundbanks Folder '%s' to watch not found.\nMake sure the Generated SoundBanks Folder setting is correct and ensure that SoundBanks are generated. Press the 'Refresh' button in the Wwise Picker to restart the watcher."), *GeneratedSoundBanksFolder);
 		bGeneratedSoundBanksFolderExists = false;
 		return;
 	}
 
 	bGeneratedSoundBanksFolderExists = true;
-	UE_LOG(LogAudiokineticTools, Verbose, TEXT("GeneratedSoundBanksDirectoryWatcher::StartSoundBanksWatcher : Starting Generated Soundbanks watcher - %s."), *CachePath);
+	UE_LOG(LogAudiokineticTools, Verbose, TEXT("GeneratedSoundBanksDirectoryWatcher::StartSoundBanksWatcher: Starting Generated Soundbanks watcher - %s."), *GeneratedSoundBanksFolder);
 	SoundBankDirectory = GeneratedSoundBanksFolder;
 	auto& DirectoryWatcherModule = FModuleManager::LoadModuleChecked<FDirectoryWatcherModule>(TEXT("DirectoryWatcher"));
 	DirectoryWatcherModule.Get()->RegisterDirectoryChangedCallback_Handle(
@@ -171,18 +194,18 @@ void GeneratedSoundBanksDirectoryWatcher::OnCacheChanged(const TArray<FFileChang
 				UpdateNotificationOnGenerationComplete();
 				EndParseTimer();
 			}
-			UE_LOG(LogAudiokineticTools, Verbose, TEXT("GeneratedSoundBanksDirectoryWatcher : SoundBankInfoCache updated."));
+			UE_LOG(LogAudiokineticTools, Verbose, TEXT("GeneratedSoundBanksDirectoryWatcher: SoundBankInfoCache updated."));
 			OnSoundBankGenerationDone();
 			break;
 		}
 	}
-	UE_LOG(LogAudiokineticTools, VeryVerbose, TEXT("GeneratedSoundBanksDirectoryWatcher : Modifications to files in Wwise project cache detected."));
+	UE_LOG(LogAudiokineticTools, VeryVerbose, TEXT("GeneratedSoundBanksDirectoryWatcher: Modifications to files in Wwise project cache detected."));
 }
 
 void GeneratedSoundBanksDirectoryWatcher::OnGeneratedSoundBanksChanged(const TArray<FFileChangeData>& ChangedFiles)
 {
 	ParseTimer = ParseDelaySeconds;
-	UE_LOG(LogAudiokineticTools, Verbose, TEXT("GeneratedSoundBanksDirectoryWatcher : %d files changed in the Generated Soundbanks folder."), ChangedFiles.Num());
+	UE_LOG(LogAudiokineticTools, Verbose, TEXT("GeneratedSoundBanksDirectoryWatcher: %d files changed in the Generated Soundbanks folder."), ChangedFiles.Num());
 	if (!PostEditorTickHandle.IsValid() && !bParseTimerRunning)
 	{
 		bParseTimerRunning = true;
@@ -193,14 +216,16 @@ void GeneratedSoundBanksDirectoryWatcher::OnGeneratedSoundBanksChanged(const TAr
 
 bool GeneratedSoundBanksDirectoryWatcher::ShouldRestartWatchers()
 {
-	return !bCacheFolderExists || !bGeneratedSoundBanksFolderExists;
+	const bool bCacheWatcherNeedsRestart = DoesWwiseProjectExist() && (!bCacheFolderExists || !CacheChangedHandle.IsValid());
+	const bool bGeneratedSoundBanksWatcherNeedsRestart = !bGeneratedSoundBanksFolderExists || !GeneratedSoundBanksHandle.IsValid();
+	return  bCacheWatcherNeedsRestart || bGeneratedSoundBanksWatcherNeedsRestart;
 }
 
 void GeneratedSoundBanksDirectoryWatcher::TimerTick(float DeltaSeconds)
 {
 	if (ParseTimer < 0 && bParseTimerRunning)
 	{
-		UE_LOG(LogAudiokineticTools, Verbose, TEXT("GeneratedSoundBanksDirectoryWatcher : No files have changed in the last %d seconds."), ParseDelaySeconds);
+		UE_LOG(LogAudiokineticTools, Verbose, TEXT("GeneratedSoundBanksDirectoryWatcher: No files have changed in the last %d seconds."), ParseDelaySeconds);
 		OnSoundBankGenerationDone();
 		EndParseTimer();
 	}
@@ -225,20 +250,18 @@ void GeneratedSoundBanksDirectoryWatcher::EndParseTimer()
 	HideNotification();
 }
 
-void GeneratedSoundBanksDirectoryWatcher::OnSoundBankGenerationDone()
+void GeneratedSoundBanksDirectoryWatcher::OnSoundBankGenerationDone() const
 {
-	UE_LOG(LogAudiokineticTools, Verbose, TEXT("GeneratedSoundBanksDirectoryWatcher : Soundbank generation done."));
+	UE_LOG(LogAudiokineticTools, Verbose, TEXT("GeneratedSoundBanksDirectoryWatcher: Soundbank generation done."));
 	OnSoundBanksGenerated.Broadcast();
-
-	// Have to call this explicitly because the AudioModule can't bind OnSoundBanksGenerated due to cyclic dependency
-	if (FAkAudioModule::AkAudioModuleInstance)
-	{
-		FAkAudioModule::AkAudioModuleInstance->ParseGeneratedSoundBankData();
-	}
 }
 
 void GeneratedSoundBanksDirectoryWatcher::NotifyFilesChanged()
 {
+	if (!FApp::CanEverRender())
+	{
+		return;
+	}
 	AsyncTask(ENamedThreads::Type::GameThread, [this]
 	{
 
@@ -264,6 +287,10 @@ void GeneratedSoundBanksDirectoryWatcher::NotifyFilesChanged()
 
 void GeneratedSoundBanksDirectoryWatcher::HideNotification()
 {
+	if (!FApp::CanEverRender())
+	{
+		return;
+	}
 	AsyncTask(ENamedThreads::Type::GameThread, [this]
 	{
 		if (this->NotificationItem)
@@ -273,8 +300,12 @@ void GeneratedSoundBanksDirectoryWatcher::HideNotification()
 	});
 }
 
-void GeneratedSoundBanksDirectoryWatcher::UpdateNotificationOnGenerationComplete()
+void GeneratedSoundBanksDirectoryWatcher::UpdateNotificationOnGenerationComplete() const
 {
+	if (!FApp::CanEverRender())
+	{
+		return;
+	}
 	AsyncTask(ENamedThreads::Type::GameThread, [this]
 	{
 		if (this->NotificationItem)
@@ -286,8 +317,12 @@ void GeneratedSoundBanksDirectoryWatcher::UpdateNotificationOnGenerationComplete
 	});
 }
 
-void GeneratedSoundBanksDirectoryWatcher::UpdateNotification()
+void GeneratedSoundBanksDirectoryWatcher::UpdateNotification() const
 {
+	if (!FApp::CanEverRender())
+	{
+		return;
+	}
 	AsyncTask(ENamedThreads::Type::GameThread, [this]
 	{
 		if (this->NotificationItem)
@@ -331,12 +366,17 @@ void GeneratedSoundBanksDirectoryWatcher::RestartWatchers()
 {
 	AsyncTask(ENamedThreads::Type::GameThread, [this]
 	{
-		if(ShouldRestartWatchers())
-		{
-			StopWatchers();
-			StartWatchers();
-		}
+		StopWatchers();
+		StartWatchers();
 	});
+}
+
+void GeneratedSoundBanksDirectoryWatcher::ConditionalRestartWatchers()
+{
+	if(ShouldRestartWatchers())
+	{
+		RestartWatchers();
+	}
 }
 
 void GeneratedSoundBanksDirectoryWatcher::Uninitialize(const bool bIsModuleShutdown)

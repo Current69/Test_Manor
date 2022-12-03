@@ -1,16 +1,18 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
-Copyright (c) 2021 Audiokinetic Inc.
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
+Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
 #include "AkSoundBankGenerationManager.h"
@@ -25,7 +27,6 @@ Copyright (c) 2021 Audiokinetic Inc.
 #include "Framework/Docking/TabManager.h"
 #include "Framework/Notifications/NotificationManager.h"
 #include "HAL/PlatformFilemanager.h"
-#include "Widgets/Notifications/SNotificationList.h"
 #include "Misc/ScopeExit.h"
 #include "Internationalization/Text.h"
 
@@ -77,10 +78,11 @@ void AkSoundBankGenerationManager::DoGeneration()
 	bool bGenerationSuccess = false;
 	switch (InitParameters.GenerationMode)
 	{
-
+#if AK_SUPPORT_WAAPI
 	case ESoundBankGenerationMode::WAAPI:
 		bGenerationSuccess = WAAPIGenerate();
 		break;
+#endif
 	case ESoundBankGenerationMode::WwiseConsole:
 	case ESoundBankGenerationMode::Commandlet:
 	default:
@@ -91,7 +93,7 @@ void AkSoundBankGenerationManager::DoGeneration()
 	WrapUpGeneration(bGenerationSuccess, TEXT("WwiseConsole"));
 }
 
-void AkSoundBankGenerationManager::WrapUpGeneration(const bool& bSuccess, const FString& BuilderName)
+void AkSoundBankGenerationManager::WrapUpGeneration(const bool bSuccess, const FString& BuilderName)
 {
 	SetIsBuilding(false);
 
@@ -200,7 +202,7 @@ bool AkSoundBankGenerationManager::WwiseConsoleGenerate()
 	FString WwiseConsoleArguments;
 #if PLATFORM_MAC
 	WwiseConsoleArguments = WwiseConsoleCommand + TEXT(" ");
-	WwiseConsoleArguments = TEXT("/bin/sh");
+	WwiseConsoleCommand = TEXT("/bin/sh");
 #endif
 	WwiseConsoleArguments += FString::Printf(TEXT("generate-soundbank \"%s\" --use-stable-guid "),
 		*PlatformFile->ConvertToAbsolutePathForExternalAppForWrite(*AkUnrealHelper::GetWwiseProjectPath()));
@@ -300,6 +302,7 @@ bool AkSoundBankGenerationManager::RunWwiseConsole(const FString& WwiseConsoleCo
 	return bGenerationSuccess;
 }
 
+#if AK_SUPPORT_WAAPI
 bool AkSoundBankGenerationManager::WAAPIGenerate()
 {
 	if (!SubscribeToGenerationDone())
@@ -365,6 +368,7 @@ bool AkSoundBankGenerationManager::WAAPIGenerate()
 
 	CleanupWaapiSubscriptions();
 	return WaapiGenerationSuccess;
+
 }
 
 bool AkSoundBankGenerationManager::SubscribeToGenerationDone()
@@ -376,6 +380,7 @@ bool AkSoundBankGenerationManager::SubscribeToGenerationDone()
 	WaitForGenerationDoneEvent = FGenericPlatformProcess::GetSynchEventFromPool();
 
 	return GenerationDoneSubscriptionId != 0;
+
 }
 
 void AkSoundBankGenerationManager::CleanupWaapiSubscriptions()
@@ -435,4 +440,5 @@ void AkSoundBankGenerationManager::OnSoundBankGenerationDone(uint64_t id, TShare
 
 	WaitForGenerationDoneEvent->Trigger();
 }
+#endif
 #undef LOCTEXT_NAMESPACE

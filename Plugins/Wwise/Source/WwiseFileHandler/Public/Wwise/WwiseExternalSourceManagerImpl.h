@@ -1,15 +1,17 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
 Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
@@ -19,64 +21,71 @@ Copyright (c) 2022 Audiokinetic Inc.
 #include "Wwise/WwiseFileState.h"
 #include "Wwise/WwiseFileHandlerBase.h"
 
-#include "WwiseExternalSourceManagerImpl.generated.h"
+class FWwiseExternalSourceFileState;
 
 struct WWISEFILEHANDLER_API FWwiseExternalSourceState : public FWwiseExternalSourceCookedData
 {
 	FWwiseExternalSourceState(const FWwiseExternalSourceCookedData& InCookedData);
 	~FWwiseExternalSourceState();
 
-	int LoadCount;
+	TAtomic<int> LoadCount;
 	void IncrementLoadCount();
 	bool DecrementLoadCount();
 };
 using FWwiseExternalSourceStateSharedPtr = TSharedPtr<FWwiseExternalSourceState>;
 
-UCLASS()
-class WWISEFILEHANDLER_API UWwiseExternalSourceManagerImpl : public UEngineSubsystem, public IWwiseExternalSourceManager, public FWwiseFileHandlerBase
+class WWISEFILEHANDLER_API FWwiseExternalSourceManagerImpl : public IWwiseExternalSourceManager, public FWwiseFileHandlerBase
 {
-	GENERATED_BODY()
-		 
 public:
-	UWwiseExternalSourceManagerImpl();
-	~UWwiseExternalSourceManagerImpl();
+	FWwiseExternalSourceManagerImpl();
+	~FWwiseExternalSourceManagerImpl();
 
-	const TCHAR* GetManagingTypeName() const override { return TEXT("External Source"); }
-	void LoadExternalSource(const FWwiseExternalSourceCookedData& InExternalSourceCookedData, const FString& InRootPath,
+	virtual const TCHAR* GetManagingTypeName() const override { return TEXT("External Source"); }
+	virtual void LoadExternalSource(const FWwiseExternalSourceCookedData& InExternalSourceCookedData, const FName& InRootPath,
 		const FWwiseLanguageCookedData& InLanguage, FLoadExternalSourceCallback&& InCallback) override;
-	void UnloadExternalSource(const FWwiseExternalSourceCookedData& InExternalSourceCookedData, const FString& InRootPath,
+	virtual void UnloadExternalSource(const FWwiseExternalSourceCookedData& InExternalSourceCookedData, const FName& InRootPath,
 		const FWwiseLanguageCookedData& InLanguage, FUnloadExternalSourceCallback&& InCallback) override;
-	void SetGranularity(AkUInt32 InStreamingGranularity) override;
+	virtual void SetGranularity(AkUInt32 InStreamingGranularity) override;
 
 	IWwiseStreamingManagerHooks& GetStreamingHooks() override final { return *this; }
 
-	bool GetExternalSourceInfo(AkExternalSourceInfo& OutInfo, const uint32 InExternalSourceCookie, const FString& InExternalSourceName) override;
-	bool GetExternalSourceInfo(AkExternalSourceInfo& OutInfo, const FWwiseExternalSourceCookedData& InCookedData) override;
-	bool GetExternalSourceInfos(TArray<AkExternalSourceInfo>& OutInfo, const TArray<FWwiseExternalSourceCookedData>& InCookedData) override;
-	bool GetExternalSourceInfos(TArray<AkExternalSourceInfo>& OutInfo, const TArray<uint32> &InExternalSourceCookies, const TArray<FString>& InExternalSourceNames = TArray<FString>()) override;
-	void OnPostEvent(const uint32 InPlayingID, const TArray<AkExternalSourceInfo> &InExternalSources) override;
-	void OnEndOfEvent(const uint32 InPlayingID) override;
+	virtual TArray<uint32> PrepareExternalSourceInfos(TArray<AkExternalSourceInfo>& OutInfo,
+		const TArray<FWwiseExternalSourceCookedData>&& InCookedData) override;
+	virtual void BindPlayingIdToExternalSources(const uint32 InPlayingId, const TArray<uint32>& InMediaIds) override;
+	virtual void OnEndOfEvent(const uint32 InPlayingID) override;
+	virtual void SetExternalSourceMediaById(const FName& ExternalSourceName, const int32 MediaId) override;
+	virtual void SetExternalSourceMediaByName(const FName& ExternalSourceName, const FName& MediaName) override;
+	virtual void SetExternalSourceMediaWithIds(const int32 ExternalSourceCookie, const int32 MediaId) override;
+
 
 #if WITH_EDITORONLY_DATA
-	virtual void Cook(UWwiseResourceCooker& InResourceCooker, const FWwiseExternalSourceCookedData& InCookedData,
+	virtual void Cook(FWwiseResourceCooker& InResourceCooker, const FWwiseExternalSourceCookedData& InCookedData,
 		TFunctionRef<void(const TCHAR* Filename, void* Data, int64 Size)> WriteAdditionalFile,
 		const FWwiseSharedPlatformId& InPlatform, const FWwiseSharedLanguageId& InLanguage) override;
 #endif
 
 protected:
-	uint32 StreamingGranularity;
+	/**
+	 * @brief Lock on the Cookie to Media Table. Lock as "ReadOnly" for using the tables (Prepare), and as "Write" for modifying the tables.
+	*/
+	FRWLock CookieToMediaLock;
+	TMap<uint32, FWwiseExternalSourceFileState*> CookieToMedia;
 
-	virtual void LoadExternalSourceImpl(const FWwiseExternalSourceCookedData& InExternalSourceCookedData, const FString& InRootPath,
+	TMultiMap<uint32, uint32> PlayingIdToMediaIds;
+
+	uint32 StreamingGranularity;
+	TMap<uint32, FWwiseExternalSourceStateSharedPtr> ExternalSourceStatesById;
+
+	virtual void LoadExternalSourceImpl(const FWwiseExternalSourceCookedData& InExternalSourceCookedData, const FName& InRootPath,
 		const FWwiseLanguageCookedData& InLanguage, FLoadExternalSourceCallback&& InCallback);
-	virtual void UnloadExternalSourceImpl(const FWwiseExternalSourceCookedData& InExternalSourceCookedData, const FString& InRootPath,
+	virtual void UnloadExternalSourceImpl(const FWwiseExternalSourceCookedData& InExternalSourceCookedData, const FName& InRootPath,
 		const FWwiseLanguageCookedData& InLanguage, FUnloadExternalSourceCallback&& InCallback);
-	virtual FWwiseExternalSourceStateSharedPtr CreateExternalSourceState(const FWwiseExternalSourceCookedData& InExternalSourceCookedData, const FString& InRootPath);
+	virtual FWwiseExternalSourceStateSharedPtr CreateExternalSourceState(const FWwiseExternalSourceCookedData& InExternalSourceCookedData, const FName& InRootPath);
 	virtual bool CloseExternalSourceState(FWwiseExternalSourceState& InExternalSourceState);
 
-	virtual void LoadExternalSourceMedia(const uint32 InExternalSourceCookie, const FString& InExternalSourceName, const FString& InRootPath, FLoadExternalSourceCallback&& InCallback);
-	virtual void UnloadExternalSourceMedia(const uint32 InExternalSourceCookie, const FString& InExternalSourceName, const FString& InRootPath, FUnloadExternalSourceCallback&& InCallback);
+	virtual void LoadExternalSourceMedia(const uint32 InExternalSourceCookie, const FName& InExternalSourceName, const FName& InRootPath, FLoadExternalSourceCallback&& InCallback);
+	virtual void UnloadExternalSourceMedia(const uint32 InExternalSourceCookie, const FName& InExternalSourceName, const FName& InRootPath, FUnloadExternalSourceCallback&& InCallback);
 
-	virtual bool GetExternalSourceInfoImpl(AkExternalSourceInfo& OutInfo, uint32 InExternalSourceCookie, const FString& ExternalSourceName);
-
-	TMap<uint32, FWwiseExternalSourceStateSharedPtr> ExternalSourceStatesById;
+	virtual uint32 PrepareExternalSourceInfo(AkExternalSourceInfo& OutInfo, const FWwiseExternalSourceCookedData& InCookedData);
+	virtual void OnDeleteState(uint32 InShortId, FWwiseFileState& InFileState, EWwiseFileStateOperationOrigin InOperationOrigin, FDecrementStateCallback&& InCallback) override;
 };

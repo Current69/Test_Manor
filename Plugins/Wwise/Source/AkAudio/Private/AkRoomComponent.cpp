@@ -1,18 +1,19 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
-Copyright (c) 2021 Audiokinetic Inc.
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
+Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
-
 
 /*=============================================================================
 	AkRoomComponent.cpp:
@@ -31,7 +32,7 @@ Copyright (c) 2021 Audiokinetic Inc.
 #include "EngineUtils.h"
 #include "AkAudioEvent.h"
 #include "AkSettings.h"
-#include "Wwise/LowLevel/WwiseLowLevelSpatialAudio.h"
+#include "Wwise/API/WwiseSpatialAudioAPI.h"
 #if WITH_EDITOR
 #include "AkDrawRoomComponent.h"
 #include "AkSpatialAudioHelper.h"
@@ -319,21 +320,29 @@ void UAkRoomComponent::InitializeParent()
 FString UAkRoomComponent::GetRoomName()
 {
 	FString nameStr = UObject::GetName();
+
 	AActor* roomOwner = GetOwner();
-	if (roomOwner == nullptr || Parent == nullptr)
-		return FString();
-	nameStr = roomOwner->GetName();
-	TInlineComponentArray<UAkRoomComponent*> RoomComponents;
-	roomOwner->GetComponents(RoomComponents);
-	if (RoomComponents.Num() > 1)
-		nameStr.Append(FString("_").Append(Parent->GetName()));
+	if (roomOwner != nullptr)
+	{
+#if WITH_EDITOR
+		nameStr = roomOwner->GetActorLabel();
+#else
+		nameStr = roomOwner->GetName();
+#endif
+		if (Parent != nullptr)
+		{
+			TInlineComponentArray<UAkRoomComponent*> RoomComponents;
+			roomOwner->GetComponents(RoomComponents);
+			if (RoomComponents.Num() > 1)
+				nameStr.Append(FString("_").Append(Parent->GetName()));
+		}
+	}
+
 	return nameStr;
 }
 
 void UAkRoomComponent::GetRoomParams(AkRoomParams& outParams)
 {
-	TArray<AAkAcousticPortal*> IntersectingPortals;
-
 	FAkAudioDevice* AkAudioDevice = FAkAudioDevice::Get();
 	if (!AkAudioDevice)
 		return;
@@ -352,7 +361,6 @@ void UAkRoomComponent::GetRoomParams(AkRoomParams& outParams)
 	{
 		if (UNLIKELY(!ReverbComp->AuxBus && ReverbComp->AuxBusName.IsEmpty()))
 		{
-			UE_CLOG(!ReverbComp->AutoAssignAuxBus, LogAkAudio, Warning, TEXT("Enabled Late Reverb component for room %s without an assigned Late Reverb Aux Bus"), *GetRoomName());
 			outParams.ReverbAuxBus = AK_INVALID_AUX_ID;
 		}
 		else
@@ -384,7 +392,7 @@ void UAkRoomComponent::AddSpatialAudioRoom()
 		SendGeometry();
 
 		FAkAudioDevice* AkAudioDevice = FAkAudioDevice::Get();
-		FWwiseLowLevelSpatialAudio* SpatialAudio = FWwiseLowLevelSpatialAudio::Get();
+		IWwiseSpatialAudioAPI* SpatialAudio = IWwiseSpatialAudioAPI::Get();
 		if (AkAudioDevice && SpatialAudio)
 		{
 			AkRoomParams Params;
@@ -404,7 +412,7 @@ void UAkRoomComponent::AddSpatialAudioRoom()
 void UAkRoomComponent::UpdateSpatialAudioRoom()
 {
 	FAkAudioDevice* AkAudioDevice = FAkAudioDevice::Get();
-	FWwiseLowLevelSpatialAudio* SpatialAudio = FWwiseLowLevelSpatialAudio::Get();
+	IWwiseSpatialAudioAPI* SpatialAudio = IWwiseSpatialAudioAPI::Get();
 	if (RoomIsActive() && AkAudioDevice && SpatialAudio && IsRegisteredWithWwise)
 	{
 		AkRoomParams Params;

@@ -1,15 +1,17 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
 Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
@@ -24,7 +26,11 @@ class WWISEFILEHANDLER_API FWwiseSoundBankFileState : public FWwiseFileState, pu
 public:
 	const FString RootPath;
 
+protected:
 	FWwiseSoundBankFileState(const FWwiseSoundBankCookedData& InCookedData, const FString& InRootPath);
+
+public:
+	~FWwiseSoundBankFileState() override;
 
 	const TCHAR* GetManagingTypeName() const override final { return TEXT("SoundBank"); }
 	uint32 GetShortId() const override final { return SoundBankId; }
@@ -39,7 +45,7 @@ public:
 	IMappedFileRegion* MappedRegion;
 
 	FWwiseInMemorySoundBankFileState(const FWwiseSoundBankCookedData& InCookedData, const FString& InRootPath);
-	~FWwiseInMemorySoundBankFileState() override { FileStateExecutionQueue.Stop(); }
+	~FWwiseInMemorySoundBankFileState() override { Term(); }
 
 	bool LoadAsMemoryView() const;
 
@@ -48,4 +54,59 @@ public:
 	void UnloadFromSoundEngine(FUnloadFromSoundEngineCallback&& InCallback) override;
 	bool CanCloseFile() const override;
 	void CloseFile(FCloseFileCallback&& InCallback) override;
+
+private:
+	void FreeMemoryIfNeeded();
+
+	struct BankLoadCookie
+	{
+		FWwiseInMemorySoundBankFileState* BankFileState;
+		FLoadInSoundEngineCallback Callback;
+
+		BankLoadCookie(FWwiseInMemorySoundBankFileState* InBankFileState)
+			: BankFileState(InBankFileState)
+		{}
+
+		BankLoadCookie(BankLoadCookie* InOther)
+		{
+			if(InOther)
+			{
+				BankFileState = InOther->BankFileState;
+				Callback = MoveTemp(InOther->Callback);
+			}
+		}
+	};
+
+	struct BankUnloadCookie
+	{
+		FWwiseInMemorySoundBankFileState* BankFileState;
+		FUnloadFromSoundEngineCallback Callback;
+
+		BankUnloadCookie(FWwiseInMemorySoundBankFileState* InBankFileState)
+			: BankFileState(InBankFileState)
+		{}
+
+		BankUnloadCookie(BankUnloadCookie* InOther)
+		{
+			if (InOther)
+			{
+				BankFileState = InOther->BankFileState;
+				Callback = MoveTemp(InOther->Callback);
+			}
+		}
+	};
+
+	static void BankLoadCallback(
+		AkUInt32	InBankID,
+		const void* InMemoryBankPtr,
+		AKRESULT	InLoadResult,
+		void*		InCookie
+	);
+
+	static void BankUnloadCallback(
+		AkUInt32	InBankID,
+		const void* InMemoryBankPtr,
+		AKRESULT	InUnloadResult,
+		void*		InCookie
+	);
 };

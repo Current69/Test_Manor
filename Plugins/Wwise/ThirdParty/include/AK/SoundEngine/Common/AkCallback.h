@@ -346,8 +346,8 @@ enum AkGlobalCallbackLocation
 
 	AkGlobalCallbackLocation_Term = (1 << 7),		///< Sound engine termination.
 
-	AkGlobalCallbackLocation_Monitor = (1 << 8),		/// Send monitor data
-	AkGlobalCallbackLocation_MonitorRecap = (1 << 9),	/// Send monitor data connection to recap.
+	AkGlobalCallbackLocation_Monitor = (1 << 8),		///< Send monitor data
+	AkGlobalCallbackLocation_MonitorRecap = (1 << 9),	///< Send monitor data connection to recap.
 
 	AkGlobalCallbackLocation_Init = (1 << 10),		///< Sound engine initialization.
 

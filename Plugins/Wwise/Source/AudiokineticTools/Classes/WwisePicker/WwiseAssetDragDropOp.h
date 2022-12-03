@@ -1,18 +1,19 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
-Copyright (c) 2021 Audiokinetic Inc.
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
+Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
-
 
 /*------------------------------------------------------------------------------------
 	WwiseEventDragDropOp.h
@@ -23,18 +24,21 @@ Copyright (c) 2021 Audiokinetic Inc.
 #include "DragAndDrop/AssetDragDropOp.h"
 #include "ContentBrowserDelegates.h"
 #include "AssetTools/Public/AssetToolsModule.h"
+#include "WwisePicker/WwisePickerHelpers.h"
 
 class FWwiseAssetDragDropOp : public FAssetDragDropOp
 {
 public:
 	DRAG_DROP_OPERATOR_TYPE(FWwiseEventDragDropOp, FAssetDragDropOp)
 
-	static TSharedRef<FAssetDragDropOp> New(TMap<FAssetData, bool> InAssetData, UActorFactory* ActorFactory = nullptr);
+	static TSharedRef<FAssetDragDropOp> New(TArray<WwisePickerHelpers::WwisePickerAssetPayload> InAssetData, UActorFactory* ActorFactory = nullptr);
 
-	static TSharedRef<FAssetDragDropOp> New(TMap<FAssetData, bool> InAssetData, TArray<FString> InAssetPaths, UActorFactory* ActorFactory);
+	static TSharedRef<FAssetDragDropOp> New(TArray<WwisePickerHelpers::WwisePickerAssetPayload> InAssetData, TArray<FString> InAssetPaths, UActorFactory* ActorFactory);
 
 	bool OnAssetViewDrop(const FAssetViewDragAndDropExtender::FPayload& Payload);
 	bool OnAssetViewDragOver(const FAssetViewDragAndDropExtender::FPayload& Payload);
+	void SaveAssets();
+	void DeleteAssets();
 
 	virtual void OnDrop(bool bDropWasHandled, const FPointerEvent& MouseEvent) override;
 
@@ -52,7 +56,7 @@ public:
 
 private:
 	// Assets contained within the drag operation. Value is true if the asset existed prior to initiating the drop.
-	TMap<FAssetData, bool> Assets;
-	FAssetToolsModule* AssetToolsModule = nullptr;
-
+	TArray<WwisePickerHelpers::WwisePickerAssetPayload> WwiseAssetsToDrop;
+	bool bDroppedOnContentBrowser = false;
+	FString AssetViewDropTargetPackagePath;
 };

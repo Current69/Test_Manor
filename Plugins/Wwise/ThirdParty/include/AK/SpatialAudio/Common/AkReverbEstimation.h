@@ -146,7 +146,7 @@ namespace ReverbEstimation
 			return AKRESULT::AK_Fail;
 		}
 		const float minDimension = AkMin(AkMin(in_environmentExtentMeters.X, in_environmentExtentMeters.Y), in_environmentExtentMeters.Z);
-		out_timeToFirstReflectionMs = minDimension / in_speedOfSound;
+		out_timeToFirstReflectionMs = (minDimension / in_speedOfSound) * 1000.0f;
 		return AKRESULT::AK_Success;
 	}
 

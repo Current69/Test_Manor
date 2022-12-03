@@ -1,33 +1,36 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
-Copyright (c) 2021 Audiokinetic Inc.
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
+Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
-
 
 #include "InitializationSettings/AkInitializationSettings.h"
 
 #include "Platforms/AkUEPlatform.h"
 #include "HAL/PlatformMemory.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
+#include "ProfilingDebugging/MiscTrace.h"
 
 #include "AkAudioDevice.h"
 #include "Wwise/WwiseIOHook.h"
-#include "Wwise/LowLevel/WwiseLowLevelComm.h"
-#include "Wwise/LowLevel/WwiseLowLevelMemoryMgr.h"
-#include "Wwise/LowLevel/WwiseLowLevelMonitor.h"
-#include "Wwise/LowLevel/WwiseLowLevelMusicEngine.h"
-#include "Wwise/LowLevel/WwiseLowLevelSoundEngine.h"
-#include "Wwise/LowLevel/WwiseLowLevelSpatialAudio.h"
-#include "Wwise/LowLevel/WwiseLowLevelStreamMgr.h"
+#include "Wwise/API/WwiseCommAPI.h"
+#include "Wwise/API/WwiseMemoryMgrAPI.h"
+#include "Wwise/API/WwiseMonitorAPI.h"
+#include "Wwise/API/WwiseMusicEngineAPI.h"
+#include "Wwise/API/WwiseSoundEngineAPI.h"
+#include "Wwise/API/WwiseSpatialAudioAPI.h"
+#include "Wwise/API/WwiseStreamMgrAPI.h"
 #include "Wwise/WwiseGlobalCallbacks.h"
 
 namespace AkInitializationSettings_Helpers
@@ -58,6 +61,40 @@ namespace AkInitializationSettings_Helpers
 			FreeFunction(address, release);
 		}
 	}
+
+	void AkProfilerPushTimer(AkPluginID in_uPluginID, const char* in_pszZoneName)
+	{
+		if (!in_pszZoneName)
+		{
+			in_pszZoneName = "(Unknown)";
+		}
+
+#if CPUPROFILERTRACE_ENABLED
+		FCpuProfilerTrace::OutputBeginDynamicEvent(in_pszZoneName);
+#endif
+#if PLATFORM_IMPLEMENTS_BeginNamedEventStatic
+		FPlatformMisc::BeginNamedEventStatic(FColor(0, 84, 159), in_pszZoneName);
+#else
+		FPlatformMisc::BeginNamedEvent(FColor(0, 84, 159), in_pszZoneName);
+#endif
+	}
+
+	void AkProfilerPopTimer()
+	{
+		FPlatformMisc::EndNamedEvent();
+#if CPUPROFILERTRACE_ENABLED
+		FCpuProfilerTrace::OutputEndEvent();
+#endif
+	}
+
+	void AkProfilerPostMarker(AkPluginID in_uPluginID, const char* in_pszMarkerName)
+	{
+		// Filter out audioFrameBoundary bookmarks, because those occur too frequently
+		if (in_uPluginID != AKMAKECLASSID(AkPluginTypeNone, AKCOMPANYID_AUDIOKINETIC, AK::ProfilingID::AudioFrameBoundary))
+		{
+			TRACE_BOOKMARK(TEXT("AK Marker: %s"), in_pszMarkerName);
+		}
+	}
 }
 
 
@@ -66,11 +103,11 @@ namespace AkInitializationSettings_Helpers
 
 FAkInitializationStructure::FAkInitializationStructure()
 {
-	auto* Comm = FWwiseLowLevelComm::Get();
-	auto* MemoryMgr = FWwiseLowLevelMemoryMgr::Get();
-	auto* MusicEngine = FWwiseLowLevelMusicEngine::Get();
-	auto* SoundEngine = FWwiseLowLevelSoundEngine::Get();
-	auto* StreamMgr = FWwiseLowLevelStreamMgr::Get();
+	auto* Comm = IWwiseCommAPI::Get();
+	auto* MemoryMgr = IWwiseMemoryMgrAPI::Get();
+	auto* MusicEngine = IWwiseMusicEngineAPI::Get();
+	auto* SoundEngine = IWwiseSoundEngineAPI::Get();
+	auto* StreamMgr = IWwiseStreamMgrAPI::Get();
 	if (UNLIKELY(!Comm || !MemoryMgr || !MusicEngine || !SoundEngine || !StreamMgr)) return;
 
 	MemoryMgr->GetDefaultSettings(MemSettings);
@@ -85,7 +122,10 @@ FAkInitializationStructure::FAkInitializationStructure()
 	InitSettings.pfnAssertHook = AkInitializationSettings_Helpers::AssertHook;
 	InitSettings.eFloorPlane = AkFloorPlane_XY;
 	InitSettings.fGameUnitsToMeters = 100.f;
-
+	InitSettings.fnProfilerPushTimer = AkInitializationSettings_Helpers::AkProfilerPushTimer;
+	InitSettings.fnProfilerPopTimer = AkInitializationSettings_Helpers::AkProfilerPopTimer;
+	InitSettings.fnProfilerPostMarker = AkInitializationSettings_Helpers::AkProfilerPostMarker;
+	
 	SoundEngine->GetDefaultPlatformInitSettings(PlatformInitSettings);
 
 	MusicEngine->GetDefaultInitSettings(MusicSettings);
@@ -144,13 +184,13 @@ void FAkInitializationStructure::SetupLLMAllocFunctions(MemoryAllocFunction allo
 
 void FAkMainOutputSettings::FillInitializationStructure(FAkInitializationStructure& InitializationStructure) const
 {
-	auto* SoundEngine = FWwiseLowLevelSoundEngine::Get();
+	auto* SoundEngine = IWwiseSoundEngineAPI::Get();
 	if (UNLIKELY(!SoundEngine)) return;
 
 	auto& OutputSettings = InitializationStructure.InitSettings.settingsMainOutput;
 
-	auto sharesetID = !AudioDeviceShareset.IsEmpty() ? SoundEngine->GetIDFromString(TCHAR_TO_ANSI(*AudioDeviceShareset)) : AK_INVALID_UNIQUE_ID;
-	OutputSettings.audioDeviceShareset = sharesetID;
+	auto ShareSetID = !AudioDeviceShareSet.IsEmpty() ? SoundEngine->GetIDFromString(TCHAR_TO_ANSI(*AudioDeviceShareSet)) : AK_INVALID_UNIQUE_ID;
+	OutputSettings.audioDeviceShareset = ShareSetID;
 
 	switch (ChannelConfigType)
 	{
@@ -307,7 +347,7 @@ void FAkAdvancedInitializationSettingsWithMultiCoreRendering::FillInitialization
 		check(pScheduler != nullptr);
 
 		auto& InitSettings = InitializationStructure.InitSettings;
-		pScheduler->InstallJobWorkerScheduler(JobWorkerMaxExecutionTimeUSec, InitSettings.settingsJobManager);
+		pScheduler->InstallJobWorkerScheduler(JobWorkerMaxExecutionTimeUSec, MaxNumJobWorkers, InitSettings.settingsJobManager);
 	}
 }
 
@@ -318,17 +358,29 @@ static void UELocalOutputFunc(
 	AkPlayingID in_playingID,
 	AkGameObjectID in_gameObjID)
 {
-	FString AkError(in_pszError);
-
 	if (!IsRunningCommandlet())
 	{
+		FString AkError(in_pszError);
+
 		if (in_eErrorLevel == AK::Monitor::ErrorLevel_Message)
 		{
-			UE_LOG(LogAkAudio, Log, TEXT("%s"), *AkError);
+			UE_LOG(LogWwiseMonitor, Log, TEXT("%s"), *AkError);
 		}
+
+#if !UE_BUILD_SHIPPING
+		else if (FPlatformMisc::IsDebuggerPresent() && AkError == TEXT("Voice Starvation"))
+		{
+			UE_LOG(LogWwiseMonitor, Log, TEXT("%s [Debugger])"), *AkError);
+		}
+#endif
+
 		else
 		{
-			UE_LOG(LogAkAudio, Error, TEXT("%s"), *AkError);
+#if UE_EDITOR
+			UE_LOG(LogWwiseMonitor, Warning, TEXT("%s"), *AkError);
+#else
+			UE_LOG(LogWwiseMonitor, Error, TEXT("%s"), *AkError);
+#endif
 		}
 	}
 }
@@ -356,13 +408,13 @@ namespace FAkSoundEngineInitialization
 		UE_CLOG(AkInitializationSettings_Helpers::IsLoggingInitialization, LogAkAudio, Verbose, TEXT("Initializing Platform"));
 		FAkPlatform::PreInitialize(InitializationStructure);
 
-		auto* Comm = FWwiseLowLevelComm::Get();
-		auto* MemoryMgr = FWwiseLowLevelMemoryMgr::Get();
-		auto* Monitor = FWwiseLowLevelMonitor::Get();
-		auto* MusicEngine = FWwiseLowLevelMusicEngine::Get();
-		auto* SoundEngine = FWwiseLowLevelSoundEngine::Get();
-		auto* SpatialAudio = FWwiseLowLevelSpatialAudio::Get();
-		auto* StreamMgr = FWwiseLowLevelStreamMgr::Get();
+		auto* Comm = IWwiseCommAPI::Get();
+		auto* MemoryMgr = IWwiseMemoryMgrAPI::Get();
+		auto* Monitor = IWwiseMonitorAPI::Get();
+		auto* MusicEngine = IWwiseMusicEngineAPI::Get();
+		auto* SoundEngine = IWwiseSoundEngineAPI::Get();
+		auto* SpatialAudio = IWwiseSpatialAudioAPI::Get();
+		auto* StreamMgr = IWwiseStreamMgrAPI::Get();
 		auto* GlobalCallbacks = FWwiseGlobalCallbacks::Get();
 
 		// Enable AK error redirection to UE log.
@@ -444,12 +496,12 @@ namespace FAkSoundEngineInitialization
 
 	void Finalize(FWwiseIOHook* IOHook)
 	{
-		auto* Comm = FWwiseLowLevelComm::Get();
-		auto* MemoryMgr = FWwiseLowLevelMemoryMgr::Get();
-		auto* Monitor = FWwiseLowLevelMonitor::Get();
-		auto* MusicEngine = FWwiseLowLevelMusicEngine::Get();
-		auto* SoundEngine = FWwiseLowLevelSoundEngine::Get();
-		auto* StreamMgr = FWwiseLowLevelStreamMgr::GetAkStreamMgr();
+		auto* Comm = IWwiseCommAPI::Get();
+		auto* MemoryMgr = IWwiseMemoryMgrAPI::Get();
+		auto* Monitor = IWwiseMonitorAPI::Get();
+		auto* MusicEngine = IWwiseMusicEngineAPI::Get();
+		auto* SoundEngine = IWwiseSoundEngineAPI::Get();
+		auto* StreamMgr = IWwiseStreamMgrAPI::GetAkStreamMgr();
 		auto* GlobalCallbacks = FWwiseGlobalCallbacks::Get();
 
 #if AK_ENABLE_COMMUNICATION

@@ -1,16 +1,18 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
-Copyright (c) 2021 Audiokinetic Inc.
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
+Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
 #include "AssetManagement/AkAssetDatabase.h"
@@ -26,9 +28,7 @@ Copyright (c) 2021 Audiokinetic Inc.
 #include "AkAudioDevice.h"
 #include "AkSettingsPerUser.h"
 #include "IAudiokineticTools.h"
-#include "WaapiRenameWatcher.h"
-
-#include "AssetRegistryModule.h"
+#include "AssetRegistry/AssetRegistryModule.h"
 #include "AssetToolsModule.h"
 #include "Async/Async.h"
 #include "Misc/FeedbackContext.h"
@@ -49,62 +49,25 @@ AkAssetDatabase::AkAssetDatabase()
 	AssetToolsModule = &FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools");
 }
 
-void AkAssetDatabase::Init()
-{
-	if ( const UAkSettingsPerUser* UserSettings = GetDefault<UAkSettingsPerUser>())
-	{
-		if (UserSettings->bAutoSyncWwiseAssetNames )
-		{
-			auto& WaapiNameSync = WaapiRenameWatcher::Get();
-			RenameAssetHandle = WaapiNameSync.OnWaapiAssetRenamedMultiDelegate.AddRaw(this, &AkAssetDatabase::OnRenameAsset);
-		}
-
-		UserSettings->OnAutoSyncWwiseAssetNamesChanged.AddLambda([this]()
-		{
-			const UAkSettingsPerUser* AkSettingsPerUser = GetDefault<UAkSettingsPerUser>();
-			if (AkSettingsPerUser && AkSettingsPerUser->bAutoSyncWwiseAssetNames)
-			{
-				BindToWaapiRename();
-			}
-			else
-			{
-				UnbindFromWaapiRename();
-			}
-		});
-	}
-}
-
-void AkAssetDatabase::BindToWaapiRename()
-{
-	UnbindFromWaapiRename();
-	auto& WaapiNameSync = WaapiRenameWatcher::Get();
-	RenameAssetHandle = WaapiNameSync.OnWaapiAssetRenamedMultiDelegate.AddRaw(this, &AkAssetDatabase::OnRenameAsset);
-}
-
-void AkAssetDatabase::UnbindFromWaapiRename()
-{
-	if (RenameAssetHandle.IsValid())
-	{
-		auto& WaapiNameSync = WaapiRenameWatcher::Get();
-		WaapiNameSync.OnWaapiAssetRenamedMultiDelegate.Remove(RenameAssetHandle);
-		RenameAssetHandle.Reset();
-	}
-}
-
 bool AkAssetDatabase::FindAllAssets(TArray<FAssetData>& OutData)
 {
+#if UE_5_1_OR_LATER
+	AssetRegistryModule->Get().GetAssetsByClass(UAkAudioType::StaticClass()->GetClassPathName(), OutData, true);
+#else
 	AssetRegistryModule->Get().GetAssetsByClass(UAkAudioType::StaticClass()->GetFName(), OutData, true);
+#endif
 	return OutData.Num() > 0;
 }
 
 bool AkAssetDatabase::FindAssets(const FGuid& AkGuid, TArray<FAssetData>& OutData)
 {
 	TMultiMap<FName, FString> Search;
-	Search.Add(GET_MEMBER_NAME_CHECKED(UAkAudioType, WwiseGuid), AkGuid.ToString(EGuidFormats::Digits));
+	Search.Add(GET_MEMBER_NAME_CHECKED(FWwiseObjectInfo, WwiseGuid), AkGuid.ToString(EGuidFormats::Digits));
 	AssetRegistryModule->Get().GetAssetsByTagValues(Search, OutData);
 
 	return OutData.Num() > 0;
 }
+
 
 bool AkAssetDatabase::FindAssets(const FString& AssetName, TArray<FAssetData>& OutData)
 {
@@ -115,10 +78,19 @@ bool AkAssetDatabase::FindAssets(const FString& AssetName, TArray<FAssetData>& O
 	return OutData.Num() > 0;
 }
 
+FAssetData AkAssetDatabase::FindAssetByObjectPath(const FSoftObjectPath& AssetPath)
+{
+#if UE_5_1_OR_LATER
+	return AssetRegistryModule->Get().GetAssetByObjectPath(AssetPath);
+#else
+	return AssetRegistryModule->Get().GetAssetByObjectPath(AssetPath.GetAssetPathName());
+#endif
+}
+
 bool AkAssetDatabase::FindFirstAsset(const FGuid& AkGuid, FAssetData& OutAsset)
 {
 	TArray<FAssetData> Assets;
-	if(FindAssets(AkGuid, Assets))
+	if (FindAssets(AkGuid, Assets))
 	{
 		OutAsset = Assets[0];
 		return true;
@@ -129,7 +101,7 @@ bool AkAssetDatabase::FindFirstAsset(const FGuid& AkGuid, FAssetData& OutAsset)
 bool AkAssetDatabase::FindFirstAsset(const FString& AssetName, FAssetData& OutAsset)
 {
 	TArray<FAssetData> Assets;
-	if(FindAssets(AssetName, Assets))
+	if (FindAssets(AssetName, Assets))
 	{
 		OutAsset = Assets[0];
 		return true;
@@ -137,8 +109,24 @@ bool AkAssetDatabase::FindFirstAsset(const FString& AssetName, FAssetData& OutAs
 	return false;
 }
 
+bool AkAssetDatabase::FindAssetsByGuidAndClass(const FGuid& AkGuid, const UClass* StaticClass, TArray<FAssetData>& OutWwiseAssets)
+{
+	TMultiMap<FName, FString> Search;
+	FARFilter Filter;
+#if UE_5_1_OR_LATER
+	Filter.ClassPaths.Add(StaticClass->GetClassPathName());
+#else
+	Filter.ClassNames.Add(StaticClass->GetFName());
+#endif
+	Filter.bRecursiveClasses = true;
+	Filter.TagsAndValues.AddUnique(GET_MEMBER_NAME_CHECKED(FWwiseObjectInfo, WwiseGuid), AkGuid.ToString(EGuidFormats::Digits));
+	AssetRegistryModule->Get().GetAssets(Filter, OutWwiseAssets);
+
+	return OutWwiseAssets.Num() > 0;
+}
+
 bool AkAssetDatabase::RenameAsset(const FGuid& Id, const FString& AssetName,
-                                  const FString& RelativePath)
+	const FString& RelativePath)
 {
 	check(IsInGameThread());
 
@@ -173,7 +161,7 @@ bool AkAssetDatabase::RenameAsset(const FGuid& Id, const FString& AssetName,
 		UE_LOG(LogAudiokineticTools, Error, TEXT("Failed to rename Wwise Assets"));
 		return false;
 	}
-	
+
 	return true;
 }
 
@@ -204,7 +192,11 @@ void AkAssetDatabase::FixUpRedirectors(const FString& AssetPackagePath)
 	TArray<UObjectRedirector*> redirectorsToFix;
 
 	TArray<FAssetData> foundRedirectorsData;
+#if UE_5_1_OR_LATER
+	AssetRegistryModule->Get().GetAssetsByClass(UObjectRedirector::StaticClass()->GetClassPathName(), foundRedirectorsData);
+#else
 	AssetRegistryModule->Get().GetAssetsByClass(UObjectRedirector::StaticClass()->GetFName(), foundRedirectorsData);
+#endif
 
 	if (foundRedirectorsData.Num() > 0)
 	{
@@ -232,6 +224,20 @@ void AkAssetDatabase::FixUpRedirectors(const FString& AssetPackagePath)
 
 bool AkAssetDatabase::IsAkAudioType(const FAssetData& AssetData)
 {
+#if UE_5_1_OR_LATER
+	static const TArray<FTopLevelAssetPath> AkAudioClassPaths = {
+		UAkAcousticTexture::StaticClass()->GetClassPathName(),
+		UAkAudioEvent::StaticClass()->GetClassPathName(),
+		UAkAuxBus::StaticClass()->GetClassPathName(),
+		UAkRtpc::StaticClass()->GetClassPathName(),
+		UAkStateValue::StaticClass()->GetClassPathName(),
+		UAkSwitchValue::StaticClass()->GetClassPathName(),
+		UAkTrigger::StaticClass()->GetClassPathName()
+	};
+
+	if (AkAudioClassPaths.Contains(AssetData.AssetClassPath))
+		return true;
+#else
 	static const TArray<FName> AkAudioClassNames = {
 		UAkAcousticTexture::StaticClass()->GetFName(),
 		UAkAudioEvent::StaticClass()->GetFName(),
@@ -244,23 +250,13 @@ bool AkAssetDatabase::IsAkAudioType(const FAssetData& AssetData)
 
 	if (AkAudioClassNames.Contains(AssetData.AssetClass))
 		return true;
-
+#endif
 	return false;
-}
-
-void AkAssetDatabase::OnRenameAsset(const FGuid& Id, const FString& AssetName, const FString& RelativePath)
-{
-	RenameAsset(Id, AssetName, RelativePath);
 }
 
 bool AkAssetDatabase::CheckIfLoadingAssets()
 {
 	return AssetRegistryModule->Get().IsLoadingAssets();
-}
-
-void AkAssetDatabase::UnInit()
-{
-	UnbindFromWaapiRename();
 }
 
 #undef LOCTEXT_NAMESPACE

@@ -239,6 +239,7 @@ struct AkInitSettings
 	AkUInt32			uNumSamplesPerFrame;		///< Number of samples per audio frame (256, 512, 1024, or 2048).
 
     AkUInt32            uMonitorQueuePoolSize;		///< Size of the monitoring queue, in bytes. This parameter is not used in Release build.
+	AkUInt32            uCpuMonitorQueueMaxSize;	///< Maximum size of the CPU monitoring queue, per thread, in bytes. This parameter is not used in Release build.
 	
 	AkOutputSettings	settingsMainOutput;			///< Main output device settings.
 	AkJobMgrSettings    settingsJobManager;         ///< Settings to configure the behavior of the Sound Engine's internal job manager
@@ -349,14 +350,11 @@ namespace AK
 		/// Gets the default values of the platform-specific initialization settings.
 		///
 		/// Windows Specific:
-		///		When initializing for Windows platform, the HWND value returned in the 
-		///		AkPlatformInitSettings structure is the foreground HWND at the moment of the 
-		///		initialization of the sound engine and may not be the correct one for your need.
-		///		Each game must specify the HWND that will be passed to DirectSound initialization.
-		///		It is required that each game provides the correct HWND to be used or it could cause
-		///		one of the following problem:
-		///				- Random Sound engine initialization failure.
-		///				- Audio focus to be located on the wrong window.
+		///		HWND is the handle of the window associated with the audio. 
+		///		Each game must specify the HWND of the application for device detection purposes. 
+		///		The value returned by GetDefaultPlatformInitSettings is the foreground HWND at
+		///		the moment of the initialization of the sound engine and might not be the correct one for your game.
+		///		Each game must provide the correct HWND to use.
 		///
 		/// \warning This function is not thread-safe.
 		/// \sa 
@@ -4190,7 +4188,9 @@ namespace AK
 			);
 
 		/// Starts recording the sound engine profiling information into a file. This file can be read
-		/// by Wwise Authoring. Note that this profiling session will record all data types possible.
+		/// by Wwise Authoring. The file is created at the base path. If you have integrated Wwise I/O,
+		/// you can use <tt>CAkDefaultIOHookBlocking::SetBasePath()</tt> (or <tt>CAkDefaultIOHookBlocking::AddBasePath()</tt>)
+		/// to change the location where the file is saved. The profiling session records all data types possible.
 		/// Note that this call captures peak metering for all the busses loaded and mixing
 		/// while this call is invoked.
 		/// \remark This function is provided as a utility tool only. It does nothing if it is 

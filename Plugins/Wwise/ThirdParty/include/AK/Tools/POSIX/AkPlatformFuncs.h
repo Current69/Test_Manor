@@ -476,6 +476,24 @@ namespace AKPLATFORM
 		size_t iAvailableSize = in_uDestMaxNumChars - strlen( in_pDest ) - 1;
 		strncat( in_pDest, in_pSrc, AkMin( iAvailableSize, strlen( in_pSrc ) ) );
 	}
+
+	inline int SafeStrFormat(wchar_t * in_pDest, size_t in_uDestMaxNumChars, const wchar_t* in_pszFmt, ...)
+	{
+		va_list args;
+		va_start(args, in_pszFmt);
+		int r = vswprintf(in_pDest, in_uDestMaxNumChars, in_pszFmt, args);
+		va_end(args);
+		return r;
+	}
+
+	inline int SafeStrFormat(char * in_pDest, size_t in_uDestMaxNumChars, const char* in_pszFmt, ...)
+	{
+		va_list args;
+		va_start(args, in_pszFmt);
+		int r = vsnprintf(in_pDest, in_uDestMaxNumChars, in_pszFmt, args);
+		va_end(args);
+		return r;
+	}
 	
 	/// Get the length, in characters, of a NULL-terminated AkUtf16 string
 	/// \return The length, in characters, of the specified string (excluding terminating NULL)

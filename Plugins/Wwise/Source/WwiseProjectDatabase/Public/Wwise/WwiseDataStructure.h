@@ -1,15 +1,17 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
 Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
@@ -19,7 +21,7 @@ Copyright (c) 2022 Audiokinetic Inc.
 #include "Wwise/Stats/ProjectDatabase.h"
 #include "Wwise/WwiseSharedLanguageId.h"
 
-#include "Wwise/Info/WwiseAssetInfo.h"
+#include "Wwise/Info/WwiseObjectInfo.h"
 #include "Wwise/Info/WwiseEventInfo.h"
 #include "Wwise/Info/WwiseGroupValueInfo.h"
 #include "Wwise/Metadata/WwiseMetadataSoundBank.h"
@@ -36,12 +38,15 @@ Copyright (c) 2022 Audiokinetic Inc.
 #include "Wwise/Ref/WwiseRefMedia.h"
 #include "Wwise/Ref/WwiseRefPlatform.h"
 #include "Wwise/Ref/WwiseRefPluginLib.h"
-#include "Wwise/Ref/WwiseRefPluginShareset.h"
+#include "Wwise/Ref/WwiseRefPluginShareSet.h"
 #include "Wwise/Ref/WwiseRefSoundBank.h"
 #include "Wwise/Ref/WwiseRefState.h"
 #include "Wwise/Ref/WwiseRefSwitch.h"
 #include "Wwise/Ref/WwiseRefSwitchContainer.h"
 #include "Wwise/Ref/WwiseRefTrigger.h"
+
+#include "Engine/EngineTypes.h"
+#include "UObject/SoftObjectPath.h"
 
 #include <inttypes.h>
 
@@ -62,7 +67,7 @@ struct WWISEPROJECTDATABASE_API FWwiseRootDataStructure
 	FWwiseRootDataStructure(WwiseMetadataFileMap&& JsonFiles);
 	FWwiseRootDataStructure& operator+=(FWwiseRootDataStructure&& Rhs);
 
-	uint32 GetLanguageId(const FString& Name) const
+	uint32 GetLanguageId(const FName& Name) const
 	{
 		if (const auto* Language = LanguageNames.Find(Name))
 		{
@@ -85,7 +90,7 @@ struct WWISEPROJECTDATABASE_API FWwisePlatformDataStructure :
 	private FWwiseRefGameParameter::FGlobalIdsMap,
 	private FWwiseRefMedia::FGlobalIdsMap,
 	private FWwiseRefPluginLib::FGlobalIdsMap,
-	private FWwiseRefPluginShareset::FGlobalIdsMap,
+	private FWwiseRefPluginShareSet::FGlobalIdsMap,
 	private FWwiseRefSoundBank::FGlobalIdsMap,
 	private FWwiseRefState::FGlobalIdsMap,
 	private FWwiseRefStateGroup::FGlobalIdsMap,
@@ -111,7 +116,7 @@ struct WWISEPROJECTDATABASE_API FWwisePlatformDataStructure :
 	WwiseGameParameterGlobalIdsMap& GameParameters;
 	WwiseMediaGlobalIdsMap& MediaFiles;
 	WwisePluginLibGlobalIdsMap& PluginLibs;
-	WwisePluginSharesetGlobalIdsMap& PluginSharesets;
+	WwisePluginShareSetGlobalIdsMap& PluginShareSets;
 	WwiseSoundBankGlobalIdsMap& SoundBanks;
 	WwiseStateGlobalIdsMap& States;
 	WwiseStateGroupGlobalIdsMap& StateGroups;
@@ -131,17 +136,16 @@ struct WWISEPROJECTDATABASE_API FWwisePlatformDataStructure :
 	FWwisePlatformDataStructure& operator+=(FWwisePlatformDataStructure&& Rhs);
 
 	template <typename RequiredRef>
-	void GetRefMap(TMap<FWwiseSharedLanguageId, RequiredRef>& OutRefMap, const TSet<FWwiseSharedLanguageId>& InLanguages, const FWwiseAssetInfo& InInfo) const;
-
-	void GetRefMap(TMap<FWwiseSharedLanguageId, TSet<FWwiseRefEvent>>& OutRefMap, const TSet<FWwiseSharedLanguageId>& InLanguages, const FWwiseEventInfo& InInfo) const;
+	void GetRefMap(TMap<FWwiseSharedLanguageId, RequiredRef>& OutRefMap, const TSet<FWwiseSharedLanguageId>& InLanguages, const FWwiseObjectInfo& InInfo) const;
 
 	template <typename RequiredRef>
-	void GetRefMap(TMap<FWwiseSharedLanguageId, RequiredRef>& OutRefMap, const TSet<FWwiseSharedLanguageId>& InLanguages, const FWwiseGroupValueInfo& InInfo) const;
+	void GetRefMap(TMap<FWwiseSharedLanguageId,  TSet<RequiredRef>>& OutRefMap, const TSet<FWwiseSharedLanguageId>& InLanguages, const FWwiseObjectInfo& InInfo) const;
 
 	template <typename RequiredRef>
-	bool GetRef(RequiredRef& OutRef, const FWwiseSharedLanguageId& InLanguage, const FWwiseAssetInfo& InInfo) const;
+	bool GetRef(TSet<RequiredRef>& OutRef, const FWwiseSharedLanguageId& InLanguage, const FWwiseObjectInfo& InInfo) const;
 
-	bool GetRef(TSet<FWwiseRefEvent>& OutRef, const FWwiseSharedLanguageId& InLanguage, const FWwiseEventInfo& InInfo) const;
+	template <typename RequiredRef>
+	bool GetRef(RequiredRef& OutRef, const FWwiseSharedLanguageId& InLanguage, const FWwiseObjectInfo& InInfo) const;
 
 	template <typename RequiredRef>
 	bool GetRef(RequiredRef& OutRef, const FWwiseSharedLanguageId& InLanguage, const FWwiseGroupValueInfo& InInfo) const;
@@ -154,7 +158,8 @@ struct WWISEPROJECTDATABASE_API FWwisePlatformDataStructure :
 	static bool GetLocalizableGroupRef(RequiredRef& OutRef, const TMap<FWwiseDatabaseLocalizableGroupValueKey, RequiredRef>& InGlobalMap,
 		FWwiseDatabaseGroupValueKey InGroupValue, uint32 InLanguageId, uint32 InSoundBankId, const TCHAR* InDebugName);
 
-	static void GetEventRefs(TArray<FWwiseRefEvent>& OutRefs, const TMap<FWwiseDatabaseEventIdKey, FWwiseRefEvent>& InGlobalMap,
+	template <typename RequiredRef>
+	static void GetLocalizableRefs(TArray<RequiredRef>& OutRefs, const TMap<FWwiseDatabaseLocalizableIdKey, RequiredRef>& InGlobalMap,
 		uint32 InShortId, uint32 InLanguageId, uint32 InSoundBankId, const TCHAR* InDebugName);
 
 	template <typename RefType>
@@ -168,21 +173,19 @@ struct WWISEPROJECTDATABASE_API FWwisePlatformDataStructure :
 	{
 		return GetLocalizableGroupRef(OutRef, RefType::FGlobalIdsMap::GlobalIdsMap, InId, InLanguageId, InSoundBankId, RefType::NAME);
 	}
+	template <typename RefType>
+	bool GetFromId(TSet<RefType>& OutRef, uint32 InId, uint32 InLanguageId, uint32 InSoundBankId) const;
 
 	bool GetFromId(FWwiseRefMedia& OutRef, uint32 InShortId, uint32 InLanguageId, uint32 InSoundBankId) const;
-	bool GetFromId(TSet<FWwiseRefEvent>& OutRef, uint32 InShortId, uint32 InLanguageId, uint32 InSoundBankId) const;
 
 	template <typename RequiredRef>
 	void AddBasicRefToMap(TMap<FWwiseDatabaseLocalizableIdKey, RequiredRef>& OutMap, const RequiredRef& InRef, const FWwiseMetadataBasicReference& InObject);
 
 	template <typename RequiredRef>
-	void AddEventRefToMap(TMap<FWwiseDatabaseEventIdKey, RequiredRef>& OutMap, const RequiredRef& InRef, const FWwiseMetadataBasicReference& InObject);
+	void AddEventRefToMap(TMap<FWwiseDatabaseLocalizableIdKey, RequiredRef>& OutMap, const RequiredRef& InRef, const FWwiseMetadataBasicReference& InObject);
 
 	template <typename RequiredRef>
-	void AddRefToMap(TMap<FWwiseDatabaseLocalizableIdKey, RequiredRef>& OutMap, const RequiredRef& InRef, const uint32& InId, const FString* InName, const FString* InObjectPath, const FGuid* InGuid);
-
-	template <typename RequiredRef>
-	void AddRefToMap(TMap<FWwiseDatabaseEventIdKey, RequiredRef>& OutMap, const RequiredRef& InRef, const uint32& InId, const FString* InName, const FString* InObjectPath, const FGuid* InGuid);
+	void AddRefToMap(TMap<FWwiseDatabaseLocalizableIdKey, RequiredRef>& OutMap, const RequiredRef& InRef, const uint32& InId, const FName* InName, const FName* InObjectPath, const FGuid* InGuid);
 
 private:
 	FWwisePlatformDataStructure& operator=(const FWwisePlatformDataStructure& Rhs) = delete;
@@ -196,7 +199,7 @@ struct WWISEPROJECTDATABASE_API FWwiseDataStructure
 	TMap<FWwiseSharedPlatformId, FWwisePlatformDataStructure> Platforms;
 
 	FWwiseDataStructure() {}
-	FWwiseDataStructure(const FDirectoryPath& InDirectoryPath, const FString* InPlatform = nullptr, const FGuid* InBasePlatformGuid = nullptr);
+	FWwiseDataStructure(const FDirectoryPath& InDirectoryPath, const FName* InPlatform = nullptr, const FGuid* InBasePlatformGuid = nullptr);
 	~FWwiseDataStructure();
 
 	FWwiseDataStructure& operator+=(FWwiseDataStructure&& Rhs);
@@ -215,7 +218,7 @@ private:
 
 
 template<typename RequiredRef>
-inline void FWwisePlatformDataStructure::GetRefMap(TMap<FWwiseSharedLanguageId, RequiredRef>& OutRefMap, const TSet<FWwiseSharedLanguageId>& InLanguages, const FWwiseAssetInfo& InInfo) const
+inline void FWwisePlatformDataStructure::GetRefMap(TMap<FWwiseSharedLanguageId, RequiredRef>& OutRefMap, const TSet<FWwiseSharedLanguageId>& InLanguages, const FWwiseObjectInfo& InInfo) const
 {
 	OutRefMap.Empty(InLanguages.Num());
 	for (const auto& Language : InLanguages)
@@ -228,63 +231,191 @@ inline void FWwisePlatformDataStructure::GetRefMap(TMap<FWwiseSharedLanguageId, 
 	}
 }
 
-
 template<typename RequiredRef>
-inline void FWwisePlatformDataStructure::GetRefMap(TMap<FWwiseSharedLanguageId, RequiredRef>& OutRefMap, const TSet<FWwiseSharedLanguageId>& InLanguages, const FWwiseGroupValueInfo& InInfo) const
+inline void FWwisePlatformDataStructure::GetRefMap(TMap<FWwiseSharedLanguageId, TSet<RequiredRef>>& OutRefMap, const TSet<FWwiseSharedLanguageId>& InLanguages, const FWwiseObjectInfo& InInfo) const
 {
 	OutRefMap.Empty(InLanguages.Num());
 	for (const auto& Language : InLanguages)
 	{
-		RequiredRef Ref;
-		if (GetRef(Ref, Language, InInfo))
+        TSet<RequiredRef> Refs;
+		if (GetRef(Refs, Language, InInfo))
 		{
-			OutRefMap.Add(Language, Ref);
+			if (Refs.Num() >1)
+			{
+				UE_LOG(LogWwiseProjectDatabase,Log, TEXT("More than one ref per language found"));
+			}
+			OutRefMap.Add(Language, Refs);
 		}
 	}
 }
 
 template <typename RequiredRef>
-inline bool FWwisePlatformDataStructure::GetRef(RequiredRef& OutRef, const FWwiseSharedLanguageId& InLanguage, const FWwiseAssetInfo& InInfo) const
+bool FWwisePlatformDataStructure::GetRef(TSet<RequiredRef>& OutRef, const FWwiseSharedLanguageId& InLanguage, const FWwiseObjectInfo& InInfo) const
 {
 	const auto LanguageId = InLanguage.GetLanguageId();
 
 	// Get from GUID
+	bool bResult = false;
+
+	if (InInfo.WwiseGuid.IsValid())
 	{
-		FWwiseDatabaseLocalizableGuidKey LocalizableGuid(InInfo.AssetGuid, LanguageId);
-		const auto* AssetFromGuid = Guids.Find(LocalizableGuid);
-		if (LIKELY(AssetFromGuid))
+		TArray<const FWwiseAnyRef*> Results;
+		if (LanguageId != 0)
 		{
-			return AssetFromGuid->GetRef(OutRef);
+			Guids.MultiFindPointer(FWwiseDatabaseLocalizableGuidKey(InInfo.WwiseGuid, LanguageId), Results, false);
 		}
-	}
-	if (LIKELY(LanguageId != 0))
-	{
-		FWwiseDatabaseLocalizableGuidKey LocalizableGuid(InInfo.AssetGuid, 0);
-		const auto* AssetFromGuid = Guids.Find(LocalizableGuid);
-		if (LIKELY(AssetFromGuid))
+		Guids.MultiFindPointer(FWwiseDatabaseLocalizableGuidKey(InInfo.WwiseGuid, 0), Results, false);
+		if (LIKELY(Results.Num() > 0))
 		{
-			return AssetFromGuid->GetRef(OutRef);
+			for (const auto* Any : Results)
+			{
+				RequiredRef Result;
+				if (LIKELY(Any->GetRef(Result)))
+				{
+					bool bAlreadyInSet = OutRef.Find(Result) != nullptr;
+					if (LIKELY(!bAlreadyInSet))
+					{
+						if (InInfo.HardCodedSoundBankShortId == 0 || InInfo.HardCodedSoundBankShortId == Result.SoundBankId())
+						{
+							OutRef.Add(Result, &bAlreadyInSet);
+							if (UNLIKELY(InInfo.WwiseName.IsNone()))
+							{
+								UE_LOG(LogWwiseProjectDatabase, Verbose, TEXT("Name not set while retrieving Wwise Object GUID %s: Should be %s or %s."),
+									*InInfo.WwiseGuid.ToString(), *Any->GetName().ToString(), *Any->GetObjectPath().ToString());
+							}
+							else if (UNLIKELY(InInfo.WwiseName != Any->GetName() && InInfo.WwiseName != Any->GetObjectPath()))
+							{
+								UE_LOG(LogWwiseProjectDatabase, Log, TEXT("Different name while retrieving Wwise Object GUID %s (%s): Should be %s or %s."),
+									*InInfo.WwiseGuid.ToString(), *InInfo.WwiseName.ToString(), *Any->GetName().ToString(), *Any->GetObjectPath().ToString());
+							}
+							if (UNLIKELY(InInfo.WwiseShortId == 0))
+							{
+								UE_LOG(LogWwiseProjectDatabase, Log, TEXT("Id not set while retrieving Wwise Object GUID %s: Should be %" PRIu32 "."),
+									*InInfo.WwiseGuid.ToString(), Any->GetId());
+							}
+							else if (UNLIKELY(InInfo.WwiseShortId != Any->GetId()))
+							{
+								UE_LOG(LogWwiseProjectDatabase, Log, TEXT("Different Id while retrieving Wwise Object GUID %s (%" PRIu32 "): Should be %" PRIu32 "."),
+									*InInfo.WwiseGuid.ToString(), InInfo.WwiseShortId, Any->GetId());
+							}
+						}
+					}
+
+					bResult |= !bAlreadyInSet;
+				}
+			}
+			return bResult;
 		}
 	}
 
 	// Get from Short ID
-	if (GetFromId(OutRef, InInfo.AssetShortId, LanguageId, InInfo.HardCodedSoundBankShortId))
+	if (InInfo.WwiseShortId != 0)
 	{
-		return true;
+		auto OldOutRefNum = OutRef.Num();
+		if (GetFromId(OutRef, InInfo.WwiseShortId, InLanguage.GetLanguageId(), InInfo.HardCodedSoundBankShortId))
+		{
+			return OldOutRefNum != OutRef.Num();
+		}
 	}
 
 	// Get from Name. Try all found assets with such name until we get one
-	TArray<const FWwiseAnyRef*> FoundAssets;
-	Names.MultiFindPointer(FWwiseDatabaseLocalizableNameKey(InInfo.AssetName, LanguageId), FoundAssets);
-	if (LIKELY(LanguageId != 0))
+	if (!InInfo.WwiseName.IsNone())
 	{
-		Names.MultiFindPointer(FWwiseDatabaseLocalizableNameKey(InInfo.AssetName, 0), FoundAssets);
+		FWwiseDatabaseLocalizableNameKey LocalizableName(InInfo.WwiseName, InLanguage.GetLanguageId());
+		TArray<const FWwiseAnyRef *> Results;
+		if (LanguageId != 0)
+		{
+			Names.MultiFindPointer(FWwiseDatabaseLocalizableNameKey(InInfo.WwiseName, 0), Results);
+		}
+		Names.MultiFindPointer(FWwiseDatabaseLocalizableNameKey(InInfo.WwiseName, LanguageId), Results);
+		for (const auto *Any : Results)
+		{
+			RequiredRef Result;
+			if (LIKELY(Any->GetRef(Result)))
+			{
+				bool bAlreadyInSet = OutRef.Find(Result) != nullptr;
+				if (LIKELY(!bAlreadyInSet))
+				{
+					OutRef.Add(Result, &bAlreadyInSet);
+					if (UNLIKELY(InInfo.WwiseName.IsNone()))
+					{
+						UE_LOG(LogWwiseProjectDatabase, Verbose, TEXT("Name not set while retrieving Wwise Object GUID %s: Should be %s or %s."),
+							   *InInfo.WwiseGuid.ToString(), *Any->GetName().ToString(), *Any->GetObjectPath().ToString());
+					}
+					else if (UNLIKELY(InInfo.WwiseName != Any->GetName() && InInfo.WwiseName != Any->GetObjectPath()))
+					{
+						UE_LOG(LogWwiseProjectDatabase, Log, TEXT("Different name while retrieving Wwise Object GUID %s (%s): Should be %s or %s."),
+							   *InInfo.WwiseGuid.ToString(), *InInfo.WwiseName.ToString(), *Any->GetName().ToString(), *Any->GetObjectPath().ToString());
+					}
+					if (UNLIKELY(InInfo.WwiseShortId == 0))
+					{
+						UE_LOG(LogWwiseProjectDatabase, Log, TEXT("Id not set while retrieving Wwise Object GUID %s: Should be %" PRIu32 "."),
+							   *InInfo.WwiseGuid.ToString(), Any->GetId());
+					}
+					else if (UNLIKELY(InInfo.WwiseShortId != Any->GetId()))
+					{
+						UE_LOG(LogWwiseProjectDatabase, Log, TEXT("Different Id while retrieving Wwise Object GUID %s (%" PRIu32 "): Should be %" PRIu32 "."),
+							   *InInfo.WwiseGuid.ToString(), InInfo.WwiseShortId, Any->GetId());
+					}
+				}
+				bResult |= !bAlreadyInSet;
+			}
+			return bResult;
+		}
 	}
-	for (const auto* Asset : FoundAssets)
+	return false;
+}
+
+template <typename RequiredRef>
+inline bool FWwisePlatformDataStructure::GetRef(RequiredRef& OutRef, const FWwiseSharedLanguageId& InLanguage, const FWwiseObjectInfo& InInfo) const
+{
+	const auto LanguageId = InLanguage.GetLanguageId();
+
+	// Get from GUID
+	if (InInfo.WwiseGuid.IsValid())
 	{
-		if (Asset->GetRef(OutRef))
+		FWwiseDatabaseLocalizableGuidKey LocalizableGuid(InInfo.WwiseGuid, LanguageId);
+		const auto *AssetFromGuid = Guids.Find(LocalizableGuid);
+		if (LIKELY(AssetFromGuid))
+		{
+			return AssetFromGuid->GetRef(OutRef);
+		}
+
+		if (LIKELY(LanguageId != 0))
+		{
+			LocalizableGuid = FWwiseDatabaseLocalizableGuidKey(InInfo.WwiseGuid, 0);
+			AssetFromGuid = Guids.Find(LocalizableGuid);
+			if (LIKELY(AssetFromGuid))
+			{
+				return AssetFromGuid->GetRef(OutRef);
+			}
+		}	
+	}
+
+	// Get from Short ID
+	if (InInfo.WwiseShortId != 0)
+	{
+		if (GetFromId(OutRef, InInfo.WwiseShortId, LanguageId, InInfo.HardCodedSoundBankShortId))
 		{
 			return true;
+		}
+	}
+
+	// Get from Name. Try all found assets with such name until we get one
+	if (!InInfo.WwiseName.IsNone())
+	{
+		TArray<const FWwiseAnyRef*> FoundAssets;
+		Names.MultiFindPointer(FWwiseDatabaseLocalizableNameKey(InInfo.WwiseName, LanguageId), FoundAssets);
+		if (LIKELY(LanguageId != 0))
+		{
+			Names.MultiFindPointer(FWwiseDatabaseLocalizableNameKey(InInfo.WwiseName, 0), FoundAssets);
+		}
+		for (const auto* Asset : FoundAssets)
+		{
+			if (Asset->GetRef(OutRef))
+			{
+				return true;
+			}
 		}
 	}
 	return false;
@@ -296,51 +427,59 @@ inline bool FWwisePlatformDataStructure::GetRef(RequiredRef& OutRef, const FWwis
 	const auto LanguageId = InLanguage.GetLanguageId();
 
 	// Get from GUID
+	if (InInfo.WwiseGuid.IsValid())
 	{
-		FWwiseDatabaseLocalizableGuidKey LocalizableGuid(InInfo.AssetGuid, LanguageId);
-		const auto* AssetFromGuid = Guids.Find(LocalizableGuid);
+		FWwiseDatabaseLocalizableGuidKey LocalizableGuid(InInfo.WwiseGuid, LanguageId);
+		const auto *AssetFromGuid = Guids.Find(LocalizableGuid);
 		if (LIKELY(AssetFromGuid))
 		{
 			return AssetFromGuid->GetRef(OutRef);
 		}
-	}
-	if (LIKELY(LanguageId != 0))
-	{
-		FWwiseDatabaseLocalizableGuidKey LocalizableGuid(InInfo.AssetGuid, 0);
-		const auto* AssetFromGuid = Guids.Find(LocalizableGuid);
-		if (LIKELY(AssetFromGuid))
+
+		if (LIKELY(LanguageId != 0))
 		{
-			return AssetFromGuid->GetRef(OutRef);
+			LocalizableGuid = FWwiseDatabaseLocalizableGuidKey(InInfo.WwiseGuid, 0);
+			AssetFromGuid = Guids.Find(LocalizableGuid);
+			if (LIKELY(AssetFromGuid))
+			{
+				return AssetFromGuid->GetRef(OutRef);
+			}
 		}
 	}
 
 	// Get from Short ID
-	if (GetFromId(OutRef, FWwiseDatabaseGroupValueKey(InInfo.GroupShortId, InInfo.AssetShortId), InLanguage.GetLanguageId(), 0))
+	if (InInfo.WwiseShortId != 0)
 	{
-		return true;
+		if (GetFromId(OutRef, FWwiseDatabaseGroupValueKey(InInfo.GroupShortId, InInfo.WwiseShortId), InLanguage.GetLanguageId(), 0))
+		{
+			return true;
+		}
 	}
 
 	// Get from Name. Try all found assets with such name until we get one
-	FWwiseDatabaseLocalizableNameKey LocalizableName(InInfo.AssetName, InLanguage.GetLanguageId());
-	TArray<const FWwiseAnyRef*> FoundAssets;
-	Names.MultiFindPointer(FWwiseDatabaseLocalizableNameKey(InInfo.AssetName, LanguageId), FoundAssets);
-	if (LIKELY(LanguageId != 0))
+	if (!InInfo.WwiseName.IsNone())
 	{
-		Names.MultiFindPointer(FWwiseDatabaseLocalizableNameKey(InInfo.AssetName, 0), FoundAssets);
-	}
-	for (const auto* Asset : FoundAssets)
-	{
-		if (Asset->GetRef(OutRef))
+		FWwiseDatabaseLocalizableNameKey LocalizableName(InInfo.WwiseName, InLanguage.GetLanguageId());
+		TArray<const FWwiseAnyRef *> FoundAssets;
+		Names.MultiFindPointer(FWwiseDatabaseLocalizableNameKey(InInfo.WwiseName, LanguageId), FoundAssets);
+		if (LIKELY(LanguageId != 0))
 		{
-			return true;
+			Names.MultiFindPointer(FWwiseDatabaseLocalizableNameKey(InInfo.WwiseName, 0), FoundAssets);
+		}
+		for (const auto *Asset : FoundAssets)
+		{
+			if (Asset->GetRef(OutRef))
+			{
+				return true;
+			}
 		}
 	}
 	return false;
 }
 
 template <typename RequiredRef>
-inline bool FWwisePlatformDataStructure::GetLocalizableRef(RequiredRef& OutRef, const TMap<FWwiseDatabaseLocalizableIdKey, RequiredRef>& InGlobalMap,
-	uint32 InShortId, uint32 InLanguageId, uint32 InSoundBankId, const TCHAR* InDebugName)
+inline bool FWwisePlatformDataStructure::GetLocalizableRef(RequiredRef & OutRef, const TMap<FWwiseDatabaseLocalizableIdKey, RequiredRef> &InGlobalMap,
+	uint32 InShortId, uint32 InLanguageId, uint32 InSoundBankId, const TCHAR *InDebugName)
 {
 	const RequiredRef* Result = nullptr;
 	if (LIKELY(InLanguageId != 0))
@@ -368,7 +507,6 @@ inline bool FWwisePlatformDataStructure::GetLocalizableRef(RequiredRef& OutRef, 
 
 	if (UNLIKELY(!Result))
 	{
-		UE_LOG(LogWwiseProjectDatabase, Warning, TEXT("Could not find %s %" PRIu32 " (Lang=%" PRIu32 "; SB=%" PRIu32 ")"), InDebugName, InShortId, InLanguageId, InSoundBankId);
 		return false;
 	}
 
@@ -389,6 +527,42 @@ inline bool FWwisePlatformDataStructure::GetLocalizableRef(RequiredRef& OutRef, 
 
 	OutRef = *Result;
 	return true;
+}
+
+template <typename RequiredRef>
+void FWwisePlatformDataStructure::GetLocalizableRefs(TArray<RequiredRef>& OutRefs,
+	const TMap<FWwiseDatabaseLocalizableIdKey, RequiredRef>& InGlobalMap, uint32 InShortId, uint32 InLanguageId,
+	uint32 InSoundBankId, const TCHAR* InDebugName)
+{
+	if (LIKELY(InLanguageId != 0 && InSoundBankId != 0))
+    {
+        const RequiredRef* Result = nullptr;
+        FWwiseDatabaseLocalizableIdKey RefId(InShortId, InLanguageId, InSoundBankId);
+        Result = InGlobalMap.Find(RefId);
+
+        if (!Result)
+        {
+            FWwiseDatabaseLocalizableIdKey NoLanguageId(InShortId, FWwiseDatabaseLocalizableIdKey::GENERIC_LANGUAGE, InSoundBankId);
+            Result = InGlobalMap.Find(NoLanguageId);
+        }
+
+        if (Result)
+        {
+            OutRefs.Add(*Result);
+        }
+    }
+    else
+    {
+        for (const auto& Elem : InGlobalMap)
+        {
+            if (UNLIKELY(Elem.Key.Id == InShortId)
+                && (InLanguageId == 0 || Elem.Key.LanguageId == InLanguageId || Elem.Key.LanguageId == 0)
+                && (InSoundBankId == 0 || Elem.Key.SoundBankId == InSoundBankId))
+            {
+                OutRefs.Add(Elem.Value);
+            }
+        }
+    }
 }
 
 template <>
@@ -421,7 +595,6 @@ inline bool FWwisePlatformDataStructure::GetLocalizableRef<FWwiseRefPluginLib>(F
 
 	if (UNLIKELY(!Result))
 	{
-		UE_LOG(LogWwiseProjectDatabase, Warning, TEXT("Could not find %s %" PRIu32 " (Lang=%" PRIu32 "; SB=%" PRIu32 ")"), InDebugName, InShortId, InLanguageId, InSoundBankId);
 		return false;
 	}
 
@@ -459,7 +632,6 @@ inline bool FWwisePlatformDataStructure::GetLocalizableGroupRef(RequiredRef& Out
 
 	if (UNLIKELY(!Result))
 	{
-		UE_LOG(LogWwiseProjectDatabase, Warning, TEXT("Could not find %s %" PRIu32 " %" PRIu32 " (Lang=%" PRIu32 "; SB=%" PRIu32 ")"), InDebugName, InGroupValue.GroupId, InGroupValue.Id, InLanguageId, InSoundBankId);
 		return false;
 	}
 
@@ -482,6 +654,20 @@ inline bool FWwisePlatformDataStructure::GetLocalizableGroupRef(RequiredRef& Out
 	return true;
 }
 
+
+template <typename RefType>
+inline	bool FWwisePlatformDataStructure::GetFromId(TSet<RefType>& OutRef, uint32 InId, uint32 InLanguageId, uint32 InSoundBankId) const
+{
+	TArray<RefType> Refs;
+	GetLocalizableRefs(Refs, RefType::FGlobalIdsMap::GlobalIdsMap, InId, InLanguageId, InSoundBankId, RefType::NAME);
+	if (LIKELY(Refs.Num() > 0))
+	{
+		OutRef.Append(Refs);
+		return true;
+	}
+	return false;
+}
+
 template<typename RequiredRef>
 inline void FWwisePlatformDataStructure::AddBasicRefToMap(TMap<FWwiseDatabaseLocalizableIdKey, RequiredRef>& OutMap, const RequiredRef& InRef, const FWwiseMetadataBasicReference& InObject)
 {
@@ -489,20 +675,20 @@ inline void FWwisePlatformDataStructure::AddBasicRefToMap(TMap<FWwiseDatabaseLoc
 }
 
 template<typename RequiredRef>
-inline void FWwisePlatformDataStructure::AddEventRefToMap(TMap<FWwiseDatabaseEventIdKey, RequiredRef>& OutMap, const RequiredRef& InRef, const FWwiseMetadataBasicReference& InObject)
+inline void FWwisePlatformDataStructure::AddEventRefToMap(TMap<FWwiseDatabaseLocalizableIdKey, RequiredRef>& OutMap, const RequiredRef& InRef, const FWwiseMetadataBasicReference& InObject)
 {
 	AddRefToMap(OutMap, InRef, InObject.Id, &InObject.Name, &InObject.ObjectPath, &InObject.GUID);
 }
 
 template<typename RequiredRef>
-void FWwisePlatformDataStructure::AddRefToMap(TMap<FWwiseDatabaseLocalizableIdKey, RequiredRef>& OutMap, const RequiredRef& InRef, const uint32& InId, const FString* InName, const FString* InObjectPath, const FGuid* InGuid)
+void FWwisePlatformDataStructure::AddRefToMap(TMap<FWwiseDatabaseLocalizableIdKey, RequiredRef>& OutMap, const RequiredRef& InRef, const uint32& InId, const FName* InName, const FName* InObjectPath, const FGuid* InGuid)
 {
 	const auto AnyRef = FWwiseAnyRef::Create(InRef);
-	if (InName && !InName->IsEmpty())
+	if (InName && !InName->IsNone())
 	{
 		Names.Add(FWwiseDatabaseLocalizableNameKey(*InName, InRef.LanguageId), AnyRef);
 	}
-	if (InObjectPath && !InObjectPath->IsEmpty())
+	if (InObjectPath && !InObjectPath->IsNone())
 	{
 		Names.Add(FWwiseDatabaseLocalizableNameKey(*InObjectPath, InRef.LanguageId), AnyRef);
 	}
@@ -513,34 +699,15 @@ void FWwisePlatformDataStructure::AddRefToMap(TMap<FWwiseDatabaseLocalizableIdKe
 	OutMap.Add(FWwiseDatabaseLocalizableIdKey(InId, InRef.LanguageId), InRef);
 }
 
-template<typename RequiredRef>
-void FWwisePlatformDataStructure::AddRefToMap(TMap<FWwiseDatabaseEventIdKey, RequiredRef>& OutMap, const RequiredRef& InRef, const uint32& InId, const FString* InName, const FString* InObjectPath, const FGuid* InGuid)
-{
-	const auto AnyRef = FWwiseAnyRef::Create(InRef);
-	if (InName && !InName->IsEmpty())
-	{
-		Names.Add(FWwiseDatabaseLocalizableNameKey(*InName, InRef.LanguageId), AnyRef);
-	}
-	if (InObjectPath && !InObjectPath->IsEmpty())
-	{
-		Names.Add(FWwiseDatabaseLocalizableNameKey(*InObjectPath, InRef.LanguageId), AnyRef);
-	}
-	if (InGuid && InGuid->IsValid())
-	{
-		Guids.Add(FWwiseDatabaseLocalizableGuidKey(*InGuid, InRef.LanguageId), AnyRef);
-	}
-	OutMap.Add(FWwiseDatabaseEventIdKey(InId, InRef.LanguageId, InRef.SoundBankId()), InRef);
-}
-
 template<>
-inline void FWwisePlatformDataStructure::AddRefToMap<FWwiseRefPluginLib>(TMap<FWwiseDatabaseLocalizableIdKey, FWwiseRefPluginLib>& OutMap, const FWwiseRefPluginLib& InRef, const uint32& InId, const FString* InName, const FString* InObjectPath, const FGuid* InGuid)
+inline void FWwisePlatformDataStructure::AddRefToMap<FWwiseRefPluginLib>(TMap<FWwiseDatabaseLocalizableIdKey, FWwiseRefPluginLib>& OutMap, const FWwiseRefPluginLib& InRef, const uint32& InId, const FName* InName, const FName* InObjectPath, const FGuid* InGuid)
 {
 	const auto AnyRef = FWwiseAnyRef::Create(InRef);
-	if (InName && !InName->IsEmpty())
+	if (InName && !InName->IsNone())
 	{
 		Names.Add(FWwiseDatabaseLocalizableNameKey(*InName, 0), AnyRef);
 	}
-	if (InObjectPath && !InObjectPath->IsEmpty())
+	if (InObjectPath && !InObjectPath->IsNone())
 	{
 		Names.Add(FWwiseDatabaseLocalizableNameKey(*InObjectPath, 0), AnyRef);
 	}

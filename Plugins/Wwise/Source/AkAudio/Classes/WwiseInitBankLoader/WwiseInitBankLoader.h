@@ -1,59 +1,44 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
 Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
 #pragma once
 
 #include "AkInitBank.h"
-#include "Wwise/CookedData/WwiseInitBankCookedData.h"
-#include "Subsystems/EngineSubsystem.h"
 
+#include "UObject/StrongObjectPtr.h"
 
-#include "WwiseInitBankLoader.generated.h"
-
-
-UCLASS()
-class UWwiseInitBankLoader : public UEngineSubsystem
+struct AKAUDIO_API FWwiseInitBankLoader
 {
-	GENERATED_BODY()
-
 public:
-	 static UWwiseInitBankLoader* Get()
-	{
-		if (UNLIKELY(!GEngine))
-		{
-			return nullptr;
-		}
-		return GEngine->GetEngineSubsystem<UWwiseInitBankLoader>();
-	}
+	static FWwiseInitBankLoader* Get();
 
-	UWwiseInitBankLoader();
+	FWwiseInitBankLoader();
 
-	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
-
-	bool FindInitBank();
 #if WITH_EDITORONLY_DATA
-	void FindOrCreateInitBank();
+	void UpdateInitBankInSettings();
 #endif
 
-	void LoadInitBank();
-	void UnloadInitBank();
-	void ReloadInitBank();
-	UAkInitBank* GetInitBankAsset() const { return InitBankAsset; }
+	void LoadInitBank() const;
+	void UnloadInitBank() const;
+	UAkInitBank* GetInitBankAsset() const;
+
+#if WITH_EDITORONLY_DATA
 private:
-
-	UPROPERTY()
-	UAkInitBank* InitBankAsset;
-
+	FDelegateHandle PostInitDelegate;
+	void OnPostInitSavePackage() const;
+#endif
 };

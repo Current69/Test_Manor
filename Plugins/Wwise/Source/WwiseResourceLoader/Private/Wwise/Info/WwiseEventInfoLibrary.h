@@ -1,15 +1,17 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
 Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
@@ -30,30 +32,30 @@ public:
 	static
 	UPARAM(DisplayName="Event Info") FWwiseEventInfo
 	MakeStruct(
-		const FGuid& AssetGuid,
-		int32 AssetShortId,
-		const FString& AssetName,
+		const FGuid& WwiseGuid,
+		int32 WwiseShortId,
+		const FString& WwiseName,
 		EWwiseEventSwitchContainerLoading SwitchContainerLoading,
 		EWwiseEventDestroyOptions DestroyOptions,
 		int32 HardCodedSoundBankShortId = 0)
 	{
-		return FWwiseEventInfo(AssetGuid, (uint32)AssetShortId, AssetName, SwitchContainerLoading, DestroyOptions, (uint32)HardCodedSoundBankShortId);
+		return FWwiseEventInfo(WwiseGuid, (uint32)WwiseShortId, FName(WwiseName), SwitchContainerLoading, DestroyOptions, (uint32)HardCodedSoundBankShortId);
 	}
 
 	UFUNCTION(BlueprintPure, Category = "Wwise|EventInfo", Meta = (BlueprintThreadSafe, DisplayName = "Break EventInfo", AdvancedDisplay = "OutDestroyOptions, OutHardCodedSoundBankShortId"))
 	static void
 	BreakStruct(
 		UPARAM(DisplayName="Event Info") FWwiseEventInfo Ref,
-		FGuid& OutAssetGuid,
-		int32& OutAssetShortId,
-		FString& OutAssetName,
+		FGuid& OutWwiseGuid,
+		int32& OutWwiseShortId,
+		FString& OutWwiseName,
 		EWwiseEventSwitchContainerLoading& OutSwitchContainerLoading,
 		EWwiseEventDestroyOptions& OutDestroyOptions,
 		int32& OutHardCodedSoundBankShortId)
 	{
-		OutAssetGuid = Ref.AssetGuid;
-		OutAssetShortId = (int32)Ref.AssetShortId;
-		OutAssetName = Ref.AssetName;
+		OutWwiseGuid = Ref.WwiseGuid;
+		OutWwiseShortId = (int32)Ref.WwiseShortId;
+		OutWwiseName = Ref.WwiseName.ToString();
 		OutSwitchContainerLoading = Ref.SwitchContainerLoading;
 		OutDestroyOptions = Ref.DestroyOptions;
 		OutHardCodedSoundBankShortId = (int32)Ref.HardCodedSoundBankShortId;
@@ -62,28 +64,28 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Wwise|Event Info", Meta = (BlueprintThreadSafe))
 	static
 	UPARAM(DisplayName="GUID") FGuid
-	GetAssetGuid(
+	GetWwiseGuid(
 		UPARAM(DisplayName="Event Info") const FWwiseEventInfo& Ref)
 	{
-		return Ref.AssetGuid;
+		return Ref.WwiseGuid;
 	}
 	
 	UFUNCTION(BlueprintPure, Category = "Wwise|Event Info", Meta = (BlueprintThreadSafe))
 	static
 	UPARAM(DisplayName="Short Id") int32
-	GetAssetShortId(
+	GetWwiseShortId(
 		UPARAM(DisplayName="Event Info") const FWwiseEventInfo& Ref)
 	{
-		return (int32)Ref.AssetShortId;
+		return (int32)Ref.WwiseShortId;
 	}
 
 	UFUNCTION(BlueprintPure, Category = "Wwise|Event Info", Meta = (BlueprintThreadSafe))
 	static
 	UPARAM(DisplayName="Name") FString
-	GetAssetName(
+	GetWwiseName(
 		UPARAM(DisplayName="Event Info") const FWwiseEventInfo& Ref)
 	{
-		return Ref.AssetName;
+		return Ref.WwiseName.ToString();
 	}
 
 	UFUNCTION(BlueprintPure, Category = "Wwise|Event Info", Meta = (BlueprintThreadSafe))
@@ -116,36 +118,36 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Wwise|Event Info", Meta = (BlueprintThreadSafe))
 	static
 	UPARAM(DisplayName="Struct Out") FWwiseEventInfo
-	SetAssetGuid(
+	SetWwiseGuid(
 		UPARAM(DisplayName="Event Info") const FWwiseEventInfo& Ref,
-		const FGuid& AssetGuid)
+		const FGuid& WwiseGuid)
 	{
 		auto Result = Ref;
-		Result.AssetGuid = AssetGuid;
+		Result.WwiseGuid = WwiseGuid;
 		return Result;
 	}
 	
 	UFUNCTION(BlueprintPure, Category = "Wwise|Event Info", Meta = (BlueprintThreadSafe))
 	static
 	UPARAM(DisplayName="Struct Out") FWwiseEventInfo
-	SetAssetShortId(
+	SetWwiseShortId(
 		UPARAM(DisplayName="Event Info") const FWwiseEventInfo& Ref,
-		int32 AssetShortId)
+		int32 WwiseShortId)
 	{
 		auto Result = Ref;
-		Result.AssetShortId = AssetShortId;
+		Result.WwiseShortId = WwiseShortId;
 		return Result;
 	}
 
 	UFUNCTION(BlueprintPure, Category = "Wwise|Event Info", Meta = (BlueprintThreadSafe))
 	static
 	UPARAM(DisplayName="Struct Out") FWwiseEventInfo
-	SetAssetName(
+	SetWwiseName(
 		UPARAM(DisplayName="Event Info") const FWwiseEventInfo& Ref,
-		const FString& AssetName)
+		const FString& WwiseName)
 	{
 		auto Result = Ref;
-		Result.AssetName = AssetName;
+		Result.WwiseName = FName(WwiseName);
 		return Result;
 	}
 

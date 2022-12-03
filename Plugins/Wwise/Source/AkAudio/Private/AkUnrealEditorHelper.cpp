@@ -1,32 +1,34 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
-Copyright (c) 2021 Audiokinetic Inc.
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
+Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
 #include "AkUnrealEditorHelper.h"
-
-
 
 #if WITH_EDITOR
 
 #include "Interfaces/IPluginManager.h"
 #include "HAL/FileManager.h"
+#include "Misc/App.h"
 #include "Misc/MessageDialog.h"
 #include "ISourceControlModule.h"
 #include "SSettingsEditorCheckoutNotice.h"
 
-#include "AkUnrealHelper.h"
 #include "AkSettings.h"
+#include "AkUnrealHelper.h"
+#include "Wwise/Stats/AkAudio.h"
 
 #if UE_5_0_OR_LATER
 #include "HAL/PlatformFileManager.h"
@@ -34,6 +36,7 @@ Copyright (c) 2021 Audiokinetic Inc.
 #include "HAL/PlatformFilemanager.h"
 #endif
 
+#define LOCTEXT_NAMESPACE "AkAudio"
 namespace AkUnrealEditorHelper
 {
 
@@ -47,7 +50,14 @@ namespace AkUnrealEditorHelper
 		FText FailReason;
 		if (!FPaths::ValidatePath(Path, &FailReason))
 		{
-			FMessageDialog::Open(EAppMsgType::Ok, FailReason);
+			if (FApp::CanEverRender())
+			{
+				FMessageDialog::Open(EAppMsgType::Ok, FailReason);
+			}
+			else
+			{
+				UE_LOG(LogAkAudio, Error, TEXT("%s"), *FailReason.ToString());
+			}
 			Path = PreviousPath;
 			return;
 		}
@@ -55,7 +65,14 @@ namespace AkUnrealEditorHelper
 		const FString AbsolutePath = IFileManager::Get().ConvertToAbsolutePathForExternalAppForRead(*Path);
 		if (!FPaths::DirectoryExists(AbsolutePath))
 		{
-			FMessageDialog::Open(EAppMsgType::Ok, DialogMessage);
+			if (FApp::CanEverRender())
+			{
+				FMessageDialog::Open(EAppMsgType::Ok, DialogMessage);
+			}
+			else
+			{
+				UE_LOG(LogAkAudio, Error, TEXT("%s"), *DialogMessage.ToString());
+			}
 			Path = PreviousPath;
 			return;
 		}
@@ -66,15 +83,19 @@ namespace AkUnrealEditorHelper
 		AkUnrealHelper::TrimPath(Path);
 
 		FString TempPath = IFileManager::Get().ConvertToAbsolutePathForExternalAppForWrite(*Path);
-
 		FText FailReason;
 		if (!FPaths::ValidatePath(TempPath, &FailReason))
 		{
-			if (EAppReturnType::Ok == FMessageDialog::Open(EAppMsgType::Ok, FailReason))
+			if (FApp::CanEverRender())
 			{
-				Path = PreviousPath;
-				return false;
+				FMessageDialog::Open(EAppMsgType::Ok, FailReason);
 			}
+			else
+			{
+				UE_LOG(LogAkAudio, Error, TEXT("%s"), *FailReason.ToString());
+			}
+			Path = PreviousPath;
+			return false;
 		}
 
 		auto ContentDirectory = AkUnrealHelper::GetContentDirectory();
@@ -85,10 +106,18 @@ namespace AkUnrealEditorHelper
 
 			if (!FPaths::DirectoryExists(TempPath))
 			{
-				if (EAppReturnType::Ok == FMessageDialog::Open(EAppMsgType::Ok, DialogMessage))
+				if (FApp::CanEverRender())
 				{
-					Path = PreviousPath;
-					return false;
+					if (EAppReturnType::Ok == FMessageDialog::Open(EAppMsgType::Ok, DialogMessage))
+					{
+						Path = PreviousPath;
+						return false;
+					}
+				}
+				else
+				{
+					// Allow setting not yet existing paths when running in headless mode (e.g. migration)
+					UE_LOG(LogAkAudio, Warning, TEXT("Path '%s' does not exist."), *Path);
 				}
 			}
 		}
@@ -105,17 +134,26 @@ namespace AkUnrealEditorHelper
 		return false;
 	}
 
-	void SaveConfigFile(UObject* ConfigObject)
+	bool SaveConfigFile(UObject* ConfigObject)
 	{
-		FString ConfigFilename = ConfigObject->GetDefaultConfigFilename();
-		if (!ISourceControlModule::Get().IsEnabled() || SettingsHelpers::IsCheckedOut(ConfigFilename) || SettingsHelpers::CheckOutOrAddFile(ConfigFilename))
+		const FString ConfigFilename = ConfigObject->GetDefaultConfigFilename();
+		if(ISourceControlModule::Get().IsEnabled())
 		{
-#if UE_5_0_OR_LATER
-			ConfigObject->TryUpdateDefaultConfigFile();
-#else
-			ConfigObject->UpdateDefaultConfigFile();
-#endif
+			if (!SettingsHelpers::IsCheckedOut(ConfigFilename, true))
+			{
+				if (!SettingsHelpers::CheckOutOrAddFile(ConfigFilename, true))
+				{
+					return false;
+				}
+			}
 		}
+
+#if UE_5_0_OR_LATER
+		return ConfigObject->TryUpdateDefaultConfigFile();
+#else
+		ConfigObject->UpdateDefaultConfigFile();
+		return true;
+#endif
 	}
 
 	FString GetLegacySoundBankDirectory()
@@ -135,8 +173,6 @@ namespace AkUnrealEditorHelper
 		return FPaths::ConvertRelativePathToFull(FPaths::ProjectContentDir());
 	}
 
-
-#define LOCTEXT_NAMESPACE "AkAudio"
 	void DeleteLegacySoundBanks()
 	{
 		const TArray<FString> ExtensionsToDelete = { "bnk", "wem", "json", "txt", "xml" };
@@ -146,20 +182,26 @@ namespace AkUnrealEditorHelper
 			TArray<FString> FoundFiles;
 			FPlatformFileManager::Get().GetPlatformFile().FindFilesRecursively(FoundFiles, *AkUnrealHelper::GetSoundBankDirectory(), *Extension);
 			FPlatformFileManager::Get().GetPlatformFile().FindFilesRecursively(FoundFiles, *GetLegacySoundBankDirectory(), *Extension);
-			for (auto& File : FoundFiles)
+			TSet<FString> FoundFilesSet(FoundFiles);
+			for (auto& File : FoundFilesSet)
 			{
-				SuccessfulDelete = FPlatformFileManager::Get().GetPlatformFile().DeleteFile(*File);
+				SuccessfulDelete |= FPlatformFileManager::Get().GetPlatformFile().DeleteFile(*File);
 			}
 		}
 
 		if (!SuccessfulDelete)
 		{
-			FMessageDialog::Open(EAppMsgType::Ok, LOCTEXT("CannotDeleteOldBanks", "Unable to delete legacy SoundBank files. Please ensure to manually delete them after migration is complete."));
-			FMessageDialog::Open(EAppMsgType::Ok, LOCTEXT("CannotDeleteOldBanks", "Unable to delete all legacy SoundBank files. Please ensure to manually delete them after migration is complete."));
+			if (!FApp::CanEverRender())
+			{
+				UE_LOG(LogAkAudio, Warning, TEXT("Unable to delete legacy SoundBank files. Please ensure to manually delete them after migration is complete."));
+			}
+			else
+			{
+				FMessageDialog::Open(EAppMsgType::Ok, LOCTEXT("CannotDeleteOldBanks", "Unable to delete legacy SoundBank files. Please ensure to manually delete them after migration is complete."));
+			}
 		}
 	}
-#undef LOCTEXT_NAMESPACE
-
 }
+#undef LOCTEXT_NAMESPACE
 
 #endif		// WITH_EDITOR

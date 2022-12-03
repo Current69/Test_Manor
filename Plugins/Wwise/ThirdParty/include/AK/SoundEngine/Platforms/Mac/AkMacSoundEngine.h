@@ -35,6 +35,7 @@ the specific language governing permissions and limitations under the License.
 #include <AK/SoundEngine/Common/AkTypes.h>
 #include <AK/Tools/Common/AkPlatformFuncs.h>
 
+/// \cond !(Web)
 /// Platform specific initialization settings
 /// \sa AK::SoundEngine::Init
 /// \sa AK::SoundEngine::GetDefaultPlatformInitSettings
@@ -50,5 +51,6 @@ struct AkPlatformInitSettings
 	// Voices.
 	AkUInt16            uNumRefillsInVoice;		///< Number of refill buffers in voice buffer. 2 == double-buffered, defaults to 4.
 };
+/// \endcond
 
 #endif //_AK_MAC_SOUND_ENGINE_H_

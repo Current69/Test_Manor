@@ -1,15 +1,17 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
 Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
@@ -24,12 +26,10 @@ struct WWISEPROJECTDATABASE_API FWwiseDatabaseMediaIdKey
 {
 	GENERATED_BODY()
 
-	UPROPERTY() uint32 MediaId;
-	UPROPERTY() uint32 SoundBankId;
+	UPROPERTY() uint32 MediaId = 0;
+	UPROPERTY() uint32 SoundBankId = 0;
 
-	FWwiseDatabaseMediaIdKey() :
-		MediaId(0),
-		SoundBankId(0)
+	FWwiseDatabaseMediaIdKey()
 	{}
 	FWwiseDatabaseMediaIdKey(uint32 InMediaId, uint32 InSoundBankId) :
 		MediaId(InMediaId),
@@ -54,26 +54,32 @@ struct WWISEPROJECTDATABASE_API FWwiseDatabaseLocalizableIdKey
 
 	static constexpr uint32 GENERIC_LANGUAGE = 0;
 
-	UPROPERTY() uint32 Id;
-	UPROPERTY() uint32 LanguageId;
+	UPROPERTY() uint32 Id = 0;
+	UPROPERTY() uint32 LanguageId = 0;
+	UPROPERTY() uint32 SoundBankId = 0;
 
-	FWwiseDatabaseLocalizableIdKey() :
-		Id(0),
-		LanguageId(0)
+	FWwiseDatabaseLocalizableIdKey()
 	{}
 	FWwiseDatabaseLocalizableIdKey(uint32 InId, uint32 InLanguageId) :
 		Id(InId),
 		LanguageId(InLanguageId)
 	{}
+	FWwiseDatabaseLocalizableIdKey(uint32 InId, uint32 InLanguageId, uint32 InSoundBankId) :
+		Id(InId),
+		LanguageId(InLanguageId),
+		SoundBankId(InSoundBankId)
+	{}
 	bool operator==(const FWwiseDatabaseLocalizableIdKey& Rhs) const
 	{
 		return Id == Rhs.Id
-			&& LanguageId == Rhs.LanguageId;
+			&& LanguageId == Rhs.LanguageId
+			&& SoundBankId == Rhs.SoundBankId;
 	}
 	bool operator<(const FWwiseDatabaseLocalizableIdKey& Rhs) const
 	{
 		return Id < Rhs.Id
-			|| Id == Rhs.Id && LanguageId < Rhs.LanguageId;
+			|| Id == Rhs.Id && LanguageId < Rhs.LanguageId
+			|| Id == Rhs.Id && LanguageId == Rhs.LanguageId && SoundBankId < Rhs.SoundBankId;
 	}
 };
 
@@ -82,12 +88,10 @@ struct WWISEPROJECTDATABASE_API FWwiseDatabaseGroupValueKey
 {
 	GENERATED_BODY()
 
-	UPROPERTY() uint32 GroupId;
-	UPROPERTY() uint32 Id;
+	UPROPERTY() uint32 GroupId = 0;
+	UPROPERTY() uint32 Id = 0;
 
-	FWwiseDatabaseGroupValueKey() :
-		GroupId(0),
-		Id(0)
+	FWwiseDatabaseGroupValueKey()
 	{}
 	FWwiseDatabaseGroupValueKey(uint32 InGroupId, uint32 InId) :
 		GroupId(InGroupId),
@@ -113,11 +117,9 @@ struct WWISEPROJECTDATABASE_API FWwiseDatabaseLocalizableGroupValueKey
 	static constexpr uint32 GENERIC_LANGUAGE = 0;
 
 	UPROPERTY() FWwiseDatabaseGroupValueKey GroupValue;
-	UPROPERTY() uint32 LanguageId;
+	UPROPERTY() uint32 LanguageId = 0;
 
-	FWwiseDatabaseLocalizableGroupValueKey() :
-		GroupValue(),
-		LanguageId(0)
+	FWwiseDatabaseLocalizableGroupValueKey()
 	{}
 	FWwiseDatabaseLocalizableGroupValueKey(uint32 InGroup, uint32 InId, uint32 InLanguageId) :
 		GroupValue(InGroup, InId),
@@ -139,40 +141,6 @@ struct WWISEPROJECTDATABASE_API FWwiseDatabaseLocalizableGroupValueKey
 	}
 };
 
-USTRUCT()
-struct WWISEPROJECTDATABASE_API FWwiseDatabaseEventIdKey
-{
-	GENERATED_BODY()
-
-	static constexpr uint32 GENERIC_LANGUAGE = 0;
-
-	UPROPERTY() uint32 Id;
-	UPROPERTY() uint32 LanguageId;
-	UPROPERTY() uint32 SoundBankId;
-
-	FWwiseDatabaseEventIdKey() :
-		Id(0),
-		LanguageId(0),
-		SoundBankId(0)
-	{}
-	FWwiseDatabaseEventIdKey(uint32 InId, uint32 InLanguageId, uint32 InSoundBankId) :
-		Id(InId),
-		LanguageId(InLanguageId),
-		SoundBankId(InSoundBankId)
-	{}
-	bool operator==(const FWwiseDatabaseEventIdKey& Rhs) const
-	{
-		return Id == Rhs.Id
-			&& LanguageId == Rhs.LanguageId
-			&& SoundBankId == Rhs.SoundBankId;
-	}
-	bool operator<(const FWwiseDatabaseEventIdKey& Rhs) const
-	{
-		return Id < Rhs.Id
-			|| Id == Rhs.Id && LanguageId < Rhs.LanguageId
-			|| Id == Rhs.Id && LanguageId == Rhs.LanguageId && SoundBankId < Rhs.SoundBankId;
-	}
-};
 
 USTRUCT()
 struct WWISEPROJECTDATABASE_API FWwiseDatabaseLocalizableGuidKey
@@ -182,11 +150,9 @@ struct WWISEPROJECTDATABASE_API FWwiseDatabaseLocalizableGuidKey
 	static constexpr uint32 GENERIC_LANGUAGE = FWwiseDatabaseLocalizableIdKey::GENERIC_LANGUAGE;
 
 	UPROPERTY() FGuid Guid;
-	UPROPERTY() uint32 LanguageId;		// 0 if no Language
+	UPROPERTY() uint32 LanguageId = 0;		// 0 if no Language
 
-	FWwiseDatabaseLocalizableGuidKey() :
-		Guid(),
-		LanguageId(0)
+	FWwiseDatabaseLocalizableGuidKey()
 	{}
 	FWwiseDatabaseLocalizableGuidKey(FGuid InGuid, uint32 InLanguageId) :
 		Guid(InGuid),
@@ -211,14 +177,12 @@ struct WWISEPROJECTDATABASE_API FWwiseDatabaseLocalizableNameKey
 
 	static constexpr uint32 GENERIC_LANGUAGE = FWwiseDatabaseLocalizableIdKey::GENERIC_LANGUAGE;
 
-	UPROPERTY() FString Name;
-	UPROPERTY() uint32 LanguageId;		// 0 if no Language
+	UPROPERTY() FName Name;
+	UPROPERTY() uint32 LanguageId = 0;		// 0 if no Language
 
-	FWwiseDatabaseLocalizableNameKey() :
-		Name(),
-		LanguageId(0)
+	FWwiseDatabaseLocalizableNameKey()
 	{}
-	FWwiseDatabaseLocalizableNameKey(FString InName, uint32 InLanguageId) :
+	FWwiseDatabaseLocalizableNameKey(FName InName, uint32 InLanguageId) :
 		Name(InName),
 		LanguageId(InLanguageId)
 	{}
@@ -229,7 +193,7 @@ struct WWISEPROJECTDATABASE_API FWwiseDatabaseLocalizableNameKey
 	}
 	bool operator<(const FWwiseDatabaseLocalizableNameKey& Rhs) const
 	{
-		return Name < Rhs.Name
+		return Name.FastLess(Rhs.Name)
 			|| Name == Rhs.Name && LanguageId < Rhs.LanguageId;
 	}
 };
@@ -238,6 +202,6 @@ uint32 WWISEPROJECTDATABASE_API GetTypeHash(const FWwiseDatabaseMediaIdKey& File
 uint32 WWISEPROJECTDATABASE_API GetTypeHash(const FWwiseDatabaseLocalizableIdKey& LocalizableId);
 uint32 WWISEPROJECTDATABASE_API GetTypeHash(const FWwiseDatabaseGroupValueKey& LocalizableGroupValue);
 uint32 WWISEPROJECTDATABASE_API GetTypeHash(const FWwiseDatabaseLocalizableGroupValueKey& LocalizableGroupValue);
-uint32 WWISEPROJECTDATABASE_API GetTypeHash(const FWwiseDatabaseEventIdKey& EventId);
+uint32 WWISEPROJECTDATABASE_API GetTypeHash(const FWwiseDatabaseLocalizableIdKey& EventId);
 uint32 WWISEPROJECTDATABASE_API GetTypeHash(const FWwiseDatabaseLocalizableGuidKey& LocalizableGuid);
 uint32 WWISEPROJECTDATABASE_API GetTypeHash(const FWwiseDatabaseLocalizableNameKey& LocalizableName);

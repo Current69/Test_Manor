@@ -1,15 +1,17 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
 Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
@@ -26,26 +28,26 @@ FWwiseMetadataEventReference::FWwiseMetadataEventReference(FWwiseMetadataLoader&
 	DurationMax(Loader.GetFloat(this, TEXT("DurationMax"), EWwiseRequiredMetadata::Optional))
 {
 	IncLoadedSize(sizeof(EWwiseMetadataEventDurationType));
-	Loader.LogParsed(TEXT("EventReference"), Id, *Name);
+	Loader.LogParsed(TEXT("EventReference"), Id, Name);
 }
 
-EWwiseMetadataEventDurationType FWwiseMetadataEventReference::DurationTypeFromString(const FString& TypeString)
+EWwiseMetadataEventDurationType FWwiseMetadataEventReference::DurationTypeFromString(const FName& TypeString)
 {
-	if (TypeString.Equals("OneShot"))
+	if (TypeString == "OneShot")
 	{
 		return EWwiseMetadataEventDurationType::OneShot;
 	}
-	else if (TypeString.Equals("Infinite"))
+	else if (TypeString == "Infinite")
 	{
 		return EWwiseMetadataEventDurationType::Infinite;
 	}
-	else if (TypeString.Equals("Mixed"))
+	else if (TypeString == "Mixed")
 	{
 		return EWwiseMetadataEventDurationType::Mixed;
 	}
-	else if (!TypeString.Equals("Unknown"))
+	else if (!(TypeString == "Unknown"))
 	{
-		UE_LOG(LogWwiseProjectDatabase, Warning, TEXT("FWwiseMetadataEventReference: Unknown DurationType: %s"), *TypeString);
+		UE_LOG(LogWwiseProjectDatabase, Warning, TEXT("FWwiseMetadataEventReference: Unknown DurationType: %s"), *TypeString.ToString());
 	}
 	return EWwiseMetadataEventDurationType::Unknown;
 }
@@ -62,7 +64,7 @@ FWwiseMetadataEvent::FWwiseMetadataEvent(FWwiseMetadataLoader& Loader) :
 	ActionSetSwitch(Loader.GetArray<FWwiseMetadataActionSetSwitchEntry>(this, TEXT("ActionSetSwitch"))),
 	ActionTrigger(Loader.GetArray<FWwiseMetadataActionTriggerEntry>(this, TEXT("ActionTrigger")))
 {
-	Loader.LogParsed(TEXT("Event"), Id, *Name);
+	Loader.LogParsed(TEXT("Event"), Id, Name);
 }
 
 bool FWwiseMetadataEvent::IsMandatory() const
@@ -77,7 +79,7 @@ bool FWwiseMetadataEvent::IsMandatory() const
 		|| MediaRefs.Num() > 0
 		|| PluginRefs && (
 			PluginRefs->Custom.Num() > 0
-			|| PluginRefs->Sharesets.Num() > 0
+			|| PluginRefs->ShareSets.Num() > 0
 			|| PluginRefs->AudioDevices.Num() > 0)
 		|| SwitchContainers.Num() == 0;
 }

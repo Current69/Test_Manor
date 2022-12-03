@@ -1,3 +1,20 @@
+/*******************************************************************************
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
+Copyright (c) 2022 Audiokinetic Inc.
+*******************************************************************************/
+
 #include "WwisePickerDataLoader.h"
 
 #include "IAudiokineticTools.h"
@@ -55,7 +72,7 @@ void FWwisePickerDataLoader::BuildTree()
 {
 	UE_LOG(LogAudiokineticTools, Log, TEXT("Rebuilding tree for Wwise Picker"));
 
-	UWwiseProjectDatabase* ProjectDatabase = UWwiseProjectDatabase::Get();
+	FWwiseProjectDatabase* ProjectDatabase = FWwiseProjectDatabase::Get();
 	if (UNLIKELY(!ProjectDatabase))
 	{
 		UE_LOG(LogAudiokineticTools, Error, TEXT("BuildTree: ProjectDatabase not loaded"));
@@ -68,7 +85,10 @@ void FWwisePickerDataLoader::BuildTree()
 
 	{
 		const FWwiseDataStructureScopeLock DataStructure(*ProjectDatabase);
-
+		if (DataStructure.GetCurrentPlatformData() == nullptr)
+		{
+			return;
+		}
 		const WwiseEventGlobalIdsMap& Events = DataStructure.GetEvents();
 		const WwiseBusGlobalIdsMap& Busses = DataStructure.GetBusses();
 		const WwiseAuxBusGlobalIdsMap& AuxBusses = DataStructure.GetAuxBusses();
@@ -78,8 +98,7 @@ void FWwisePickerDataLoader::BuildTree()
 		const WwiseSwitchGlobalIdsMap& Switches = DataStructure.GetSwitches();
 		const WwiseGameParameterGlobalIdsMap& GameParameters = DataStructure.GetGameParameters();
 		const WwiseTriggerGlobalIdsMap& Triggers = DataStructure.GetTriggers();
-		const WwisePluginSharesetGlobalIdsMap& EffectSharesets = DataStructure.GetPluginSharesets();
-
+		const WwisePluginShareSetGlobalIdsMap& EffectShareSets = DataStructure.GetPluginShareSets();
 		const WwiseSwitchGroupGlobalIdsMap SwitchGroups = DataStructure.GetSwitchGroups();
 
 		BuildEvents(Events);
@@ -92,41 +111,41 @@ void FWwisePickerDataLoader::BuildTree()
 		BuildSwitches(Switches);
 		BuildGameParameters(GameParameters);
 		BuildTriggers(Triggers);
-		BuildEffectShareSets(EffectSharesets);
+		BuildEffectShareSets(EffectShareSets);
 	}
 }
 
 void FWwisePickerDataLoader::BuildEvents(const WwiseEventGlobalIdsMap& Events)
 {
-	const auto& FolderItem = MakeShared<FWwiseTreeItem>(FString("Event"), "",  nullptr, EWwiseItemType::Folder, FGuid());
+	const auto& FolderItem = MakeShared<FWwiseTreeItem>(EWwiseItemType::EventsPickerName, "",  nullptr, EWwiseItemType::Folder, FGuid());
 	WwiseItemTypeRoots.Add(EWwiseItemType::Event, FolderItem);
 
 	for (const auto& Event :Events)
 	{
 		const auto& WwiseItem = Event.Value.GetEvent();
-		UE_LOG(LogAudiokineticTools, Verbose, TEXT("Event Name: %s"), *WwiseItem->Name);
+		UE_LOG(LogAudiokineticTools, Verbose, TEXT("Event Name: %s"), *WwiseItem->Name.ToString());
 
-		FWwiseMetadataBasicReference EventRef = FWwiseMetadataBasicReference(WwiseItem->Id, *WwiseItem->Name, *WwiseItem->ObjectPath, FGuid(WwiseItem->GUID));
+		FWwiseMetadataBasicReference EventRef = FWwiseMetadataBasicReference(WwiseItem->Id, WwiseItem->Name, WwiseItem->ObjectPath, WwiseItem->GUID);
 		if(!BuildFolderHierarchy(EventRef, EWwiseItemType::Event, FolderItem))
 		{
-			UE_LOG(LogAudiokineticTools, Error, TEXT("Failed to place %s in the Wwise Picker"), *WwiseItem->ObjectPath);
+			UE_LOG(LogAudiokineticTools, Error, TEXT("Failed to place %s in the Wwise Picker"), *WwiseItem->ObjectPath.ToString());
 		}
 	}
 }
 
 void FWwisePickerDataLoader::BuildBusses(const WwiseBusGlobalIdsMap& Busses)
 {
-	const auto& FolderItem = MakeShared<FWwiseTreeItem>(FString("Aux Bus"), "",  nullptr, EWwiseItemType::Folder, FGuid());
+	const auto& FolderItem = MakeShared<FWwiseTreeItem>(EWwiseItemType::BussesPickerName, "",  nullptr, EWwiseItemType::Folder, FGuid());
 	WwiseItemTypeRoots.Add(EWwiseItemType::AuxBus, FolderItem);
 
 	for (auto& Bus : Busses)
 	{
 		const auto& WwiseItem = Bus.Value.GetBus();
-		UE_LOG(LogAudiokineticTools, Verbose, TEXT("Bus Name: %s"), *WwiseItem->Name);
+		UE_LOG(LogAudiokineticTools, Verbose, TEXT("Bus Name: %s"), *WwiseItem->Name.ToString());
 
 		if(!BuildFolderHierarchy(*WwiseItem, EWwiseItemType::Bus, FolderItem))
 		{
-			UE_LOG(LogAudiokineticTools, Error, TEXT("Failed to place %s in the Wwise Picker"), *WwiseItem->ObjectPath);
+			UE_LOG(LogAudiokineticTools, Error, TEXT("Failed to place %s in the Wwise Picker"), *WwiseItem->ObjectPath.ToString());
 		}
 	}
 }
@@ -139,45 +158,45 @@ void FWwisePickerDataLoader::BuildAuxBusses(const WwiseAuxBusGlobalIdsMap& AuxBu
 	for (TTuple<FWwiseDatabaseLocalizableIdKey, FWwiseRefAuxBus> AuxBus : AuxBusses)
 	{
 		const auto& WwiseItem = AuxBus.Value.GetAuxBus();
-		UE_LOG(LogAudiokineticTools, Verbose, TEXT("Aux Bus Name: %s"), *WwiseItem->Name);
+		UE_LOG(LogAudiokineticTools, Verbose, TEXT("Aux Bus Name: %s"), *WwiseItem->Name.ToString());
 
 		if(!BuildFolderHierarchy(*WwiseItem, EWwiseItemType::AuxBus, FolderItem))
 		{
-			UE_LOG(LogAudiokineticTools, Error, TEXT("Failed to place %s in the Wwise Picker"), *WwiseItem->ObjectPath);
+			UE_LOG(LogAudiokineticTools, Error, TEXT("Failed to place %s in the Wwise Picker"), *WwiseItem->ObjectPath.ToString());
 		}
 	}
 }
 
 void FWwisePickerDataLoader::BuildAcousticTextures(const WwiseAcousticTextureGlobalIdsMap& AcousticTextures)
 {
-	const auto& FolderItem = MakeShared<FWwiseTreeItem>(FString("AcousticTexture"), "",  nullptr, EWwiseItemType::Folder, FGuid());
+	const auto& FolderItem = MakeShared<FWwiseTreeItem>(EWwiseItemType::AcousticTexturesPickerName, "",  nullptr, EWwiseItemType::Folder, FGuid());
 	WwiseItemTypeRoots.Add(EWwiseItemType::AcousticTexture, FolderItem);
 
 	for (const auto& AcousticTexture :AcousticTextures)
 	{
 		const FWwiseMetadataAcousticTexture* WwiseItem = AcousticTexture.Value.GetAcousticTexture();
-		UE_LOG(LogAudiokineticTools, Verbose, TEXT("Acoustic Texture Name: %s"), *WwiseItem->Name);
+		UE_LOG(LogAudiokineticTools, Verbose, TEXT("Acoustic Texture Name: %s"), *WwiseItem->Name.ToString());
 
 		if(!BuildFolderHierarchy(*WwiseItem, EWwiseItemType::AcousticTexture, FolderItem))
 		{
-			UE_LOG(LogAudiokineticTools, Error, TEXT("Failed to place %s in the Wwise Picker"), *WwiseItem->ObjectPath);
+			UE_LOG(LogAudiokineticTools, Error, TEXT("Failed to place %s in the Wwise Picker"), *WwiseItem->ObjectPath.ToString());
 		}
 	}
 }
 
 void FWwisePickerDataLoader::BuildStateGroups(const WwiseStateGroupGlobalIdsMap& StateGroups)
 {
-	const auto& FolderItem = MakeShared<FWwiseTreeItem>(FString("State"), "",  nullptr, EWwiseItemType::Folder, FGuid());
+	const auto& FolderItem = MakeShared<FWwiseTreeItem>(EWwiseItemType::StatesPickerName, "",  nullptr, EWwiseItemType::Folder, FGuid());
 	WwiseItemTypeRoots.Add(EWwiseItemType::State, FolderItem);
 
 	for (const auto& StateGroup : StateGroups)
 	{
 		const auto& WwiseItem = StateGroup.Value.GetStateGroup();
-		UE_LOG(LogAudiokineticTools, Verbose, TEXT("State Group Name: %s"), *WwiseItem->Name);
+		UE_LOG(LogAudiokineticTools, Verbose, TEXT("State Group Name: %s"), *WwiseItem->Name.ToString());
 
 		if(!BuildFolderHierarchy(*WwiseItem, EWwiseItemType::StateGroup, FolderItem))
 		{
-			UE_LOG(LogAudiokineticTools, Error, TEXT("Failed to place %s in the Wwise Picker"), *WwiseItem->ObjectPath);
+			UE_LOG(LogAudiokineticTools, Error, TEXT("Failed to place %s in the Wwise Picker"), *WwiseItem->ObjectPath.ToString());
 		}
 	}
 }
@@ -192,24 +211,24 @@ void FWwisePickerDataLoader::BuildStates(const WwiseStateGlobalIdsMap& States)
 
 		if(!BuildFolderHierarchy(*WwiseItem, EWwiseItemType::State, StateGroupFolderItem))
 		{
-			UE_LOG(LogAudiokineticTools, Error, TEXT("Failed to place %s in the Wwise Picker"), *WwiseItem->ObjectPath);
+			UE_LOG(LogAudiokineticTools, Error, TEXT("Failed to place %s in the Wwise Picker"), *WwiseItem->ObjectPath.ToString());
 		}
 	}
 }
 
 void FWwisePickerDataLoader::BuildSwitchGroups(const WwiseSwitchGroupGlobalIdsMap& SwitchGroups)
 {
-	const auto& FolderItem = MakeShared<FWwiseTreeItem>(FString("Switch"), "",  nullptr, EWwiseItemType::Folder, FGuid());
+	const auto& FolderItem = MakeShared<FWwiseTreeItem>(EWwiseItemType::SwitchesPickerName, "",  nullptr, EWwiseItemType::Folder, FGuid());
 	WwiseItemTypeRoots.Add(EWwiseItemType::Switch, FolderItem);
 
 	for (const auto& SwitchGroup :SwitchGroups)
 	{
 		const auto& WwiseItem = SwitchGroup.Value.GetSwitchGroup();
-		UE_LOG(LogAudiokineticTools, Verbose, TEXT("Switch Group Name: %s"), *WwiseItem->Name);
+		UE_LOG(LogAudiokineticTools, Verbose, TEXT("Switch Group Name: %s"), *WwiseItem->Name.ToString());
 
 		if(!BuildFolderHierarchy(*WwiseItem, EWwiseItemType::SwitchGroup, FolderItem))
 		{
-			UE_LOG(LogAudiokineticTools, Error, TEXT("Failed to place %s in the Wwise Picker"), *WwiseItem->ObjectPath);
+			UE_LOG(LogAudiokineticTools, Error, TEXT("Failed to place %s in the Wwise Picker"), *WwiseItem->ObjectPath.ToString());
 		}
 	}
 }
@@ -225,58 +244,58 @@ void FWwisePickerDataLoader::BuildSwitches(const WwiseSwitchGlobalIdsMap& Switch
 
 		if(!BuildFolderHierarchy(*WwiseItem, EWwiseItemType::Switch, SwitchGroupFolderItem))
 		{
-			UE_LOG(LogAudiokineticTools, Error, TEXT("Failed to place %s in the Wwise Picker"), *WwiseItem->ObjectPath);
+			UE_LOG(LogAudiokineticTools, Error, TEXT("Failed to place %s in the Wwise Picker"), *WwiseItem->ObjectPath.ToString());
 		}
 	}
 }
 
 void FWwisePickerDataLoader::BuildGameParameters(const WwiseGameParameterGlobalIdsMap& GameParameters)
 {
-	const auto& FolderItem = MakeShared<FWwiseTreeItem>(FString("Game Parameter"), "",  nullptr, EWwiseItemType::Folder, FGuid());
+	const auto& FolderItem = MakeShared<FWwiseTreeItem>(EWwiseItemType::GameParametersPickerName, "",  nullptr, EWwiseItemType::Folder, FGuid());
 	WwiseItemTypeRoots.Add(EWwiseItemType::GameParameter, FolderItem);
 
 	for (const auto& GameParameter : GameParameters)
 	{
 		const FWwiseMetadataGameParameter* WwiseItem = GameParameter.Value.GetGameParameter();
-		UE_LOG(LogAudiokineticTools, Verbose, TEXT("GameParameter Name: %s"), *WwiseItem->Name);
+		UE_LOG(LogAudiokineticTools, Verbose, TEXT("GameParameter Name: %s"), *WwiseItem->Name.ToString());
 
 		if(!BuildFolderHierarchy(*WwiseItem, EWwiseItemType::GameParameter, FolderItem))
 		{
-			UE_LOG(LogAudiokineticTools, Error, TEXT("Failed to place %s in the Wwise Picker"), *WwiseItem->ObjectPath);
+			UE_LOG(LogAudiokineticTools, Error, TEXT("Failed to place %s in the Wwise Picker"), *WwiseItem->ObjectPath.ToString());
 		}
 	}
 }
 
 void FWwisePickerDataLoader::BuildTriggers(const WwiseTriggerGlobalIdsMap& Triggers)
 {
-	const auto& FolderItem = MakeShared<FWwiseTreeItem>(FString("Trigger"), "",  nullptr, EWwiseItemType::Folder, FGuid());
+	const auto& FolderItem = MakeShared<FWwiseTreeItem>(EWwiseItemType::TriggersPickerName, "",  nullptr, EWwiseItemType::Folder, FGuid());
 	WwiseItemTypeRoots.Add(EWwiseItemType::Trigger, FolderItem);
 
 	for (const auto& Trigger :Triggers)
 	{
 		const auto& WwiseItem = Trigger.Value.GetTrigger();
-		UE_LOG(LogAudiokineticTools, Verbose, TEXT("Trigger Name: %s"), *WwiseItem->Name);
+		UE_LOG(LogAudiokineticTools, Verbose, TEXT("Trigger Name: %s"), *WwiseItem->Name.ToString());
 
 		if(!BuildFolderHierarchy(*WwiseItem, EWwiseItemType::Trigger, FolderItem))
 		{
-			UE_LOG(LogAudiokineticTools, Error, TEXT("Failed to place %s in the Wwise Picker"), *WwiseItem->ObjectPath);
+			UE_LOG(LogAudiokineticTools, Error, TEXT("Failed to place %s in the Wwise Picker"), *WwiseItem->ObjectPath.ToString());
 		}
 	}
 }
 
-void FWwisePickerDataLoader::BuildEffectShareSets(const WwisePluginSharesetGlobalIdsMap& EffectSharesets)
+void FWwisePickerDataLoader::BuildEffectShareSets(const WwisePluginShareSetGlobalIdsMap& EffectShareSets)
 {
-	const auto& FolderItem = MakeShared<FWwiseTreeItem>(FString("Effect Shareset"), "",  nullptr, EWwiseItemType::Folder, FGuid());
+	const auto& FolderItem = MakeShared<FWwiseTreeItem>(EWwiseItemType::ShareSetsPickerName, "",  nullptr, EWwiseItemType::Folder, FGuid());
 	WwiseItemTypeRoots.Add(EWwiseItemType::EffectShareSet, FolderItem);
 
-	for (const auto& EffectShareset :EffectSharesets)
+	for (const auto& EffectShareSet :EffectShareSets)
 	{
-		const auto& WwiseItem = EffectShareset.Value.GetPlugin();
-		UE_LOG(LogAudiokineticTools, Verbose, TEXT("Shareset Name: %s"), *WwiseItem->Name);
+		const auto& WwiseItem = EffectShareSet.Value.GetPlugin();
+		UE_LOG(LogAudiokineticTools, Verbose, TEXT("ShareSet Name: %s"), *WwiseItem->Name.ToString());
 
 		if(!BuildFolderHierarchy(*WwiseItem, EWwiseItemType::EffectShareSet, FolderItem))
 		{
-			UE_LOG(LogAudiokineticTools, Error, TEXT("Failed to place %s in the Wwise Picker"), *WwiseItem->ObjectPath);
+			UE_LOG(LogAudiokineticTools, Error, TEXT("Failed to place %s in the Wwise Picker"), *WwiseItem->ObjectPath.ToString());
 		}
 	}
 }
@@ -308,7 +327,7 @@ bool FWwisePickerDataLoader::BuildFolderHierarchy(
 	const FWwiseMetadataBasicReference& WwiseItem, EWwiseItemType::Type
 	ItemType, const TSharedPtr<FWwiseTreeItem> CurrentRootFolder)
 {
-		const FString ItemPath = WwiseItem.ObjectPath;
+		const FString ItemPath = WwiseItem.ObjectPath.ToString();
 		WwiseItemTreePath TreePath;
 		TSharedPtr<FWwiseTreeItem> ParentItem = CurrentRootFolder;
 
@@ -343,7 +362,7 @@ bool FWwisePickerDataLoader::BuildFolderHierarchy(
 
 			if (!AllValidTreeItemsByGuid.Find(WwiseItem.GUID))
 			{
-				const auto& NewWwiseTreeItem = MakeShared<FWwiseTreeItem>(WwiseItem.Name, WwiseItem.ObjectPath, ParentItem,
+				const auto& NewWwiseTreeItem = MakeShared<FWwiseTreeItem>(WwiseItem.Name.ToString(), WwiseItem.ObjectPath.ToString(), ParentItem,
 					ItemType, WwiseItem.GUID);
 				ParentItem->AddChild(NewWwiseTreeItem);
 				AllValidTreeItemsByGuid.Add(NewWwiseTreeItem->ItemId, NewWwiseTreeItem);
@@ -351,7 +370,7 @@ bool FWwisePickerDataLoader::BuildFolderHierarchy(
 				if (ItemType == EWwiseItemType::Bus || ItemType == EWwiseItemType::SwitchGroup || ItemType ==
 					EWwiseItemType::StateGroup)
 				{
-					NodesByPath.Add(WwiseItem.ObjectPath, NewWwiseTreeItem);
+					NodesByPath.Add(WwiseItem.ObjectPath.ToString(), NewWwiseTreeItem);
 				}
 			}
 

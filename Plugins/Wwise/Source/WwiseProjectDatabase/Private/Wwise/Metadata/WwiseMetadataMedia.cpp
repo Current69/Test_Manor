@@ -1,15 +1,17 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
 Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
@@ -35,23 +37,23 @@ FWwiseMetadataMediaAttributes::FWwiseMetadataMediaAttributes(FWwiseMetadataLoade
 	Loader.LogParsed(TEXT("MediaAttributes"), Id);
 }
 
-EWwiseMetadataMediaLocation FWwiseMetadataMediaAttributes::LocationFromString(const FString& LocationString)
+EWwiseMetadataMediaLocation FWwiseMetadataMediaAttributes::LocationFromString(const FName& LocationString)
 {
-	if (LocationString.Equals(TEXT("Memory")))
+	if (LocationString == "Memory")
 	{
 		return EWwiseMetadataMediaLocation::Memory;
 	}
-	else if (LocationString.Equals(TEXT("Loose")))
+	else if (LocationString == "Loose")
 	{
 		return EWwiseMetadataMediaLocation::Loose;
 	}
-	else if (LocationString.Equals(TEXT("OtherBank")))
+	else if (LocationString == "OtherBank")
 	{
 		return EWwiseMetadataMediaLocation::OtherBank;
 	}
 	else
 	{
-		UE_LOG(LogWwiseProjectDatabase, Warning, TEXT("FWwiseMetadataMediaAttributes: Unknown Location: %s"), *LocationString);
+		UE_LOG(LogWwiseProjectDatabase, Warning, TEXT("FWwiseMetadataMediaAttributes: Unknown Location: %s"), *LocationString.ToString());
 		return EWwiseMetadataMediaLocation::Unknown;
 	}
 }
@@ -63,15 +65,15 @@ FWwiseMetadataMedia::FWwiseMetadataMedia(FWwiseMetadataLoader& Loader) :
 	CachePath(Loader.GetString(this, TEXT("CachePath"), EWwiseRequiredMetadata::Optional)),
 	PrefetchSize(Loader.GetUint32(this, TEXT("PrefetchSize"), EWwiseRequiredMetadata::Optional))
 {
-	if (UNLIKELY(Path.IsEmpty() && Location == EWwiseMetadataMediaLocation::Loose))
+	if (UNLIKELY(Path.IsNone() && Location == EWwiseMetadataMediaLocation::Loose))
 	{
 		Loader.Fail(TEXT("!Path+Location=Loose"));
 	}
-	else if (UNLIKELY(Path.IsEmpty() && Location == EWwiseMetadataMediaLocation::Memory && bStreaming))
+	else if (UNLIKELY(Path.IsNone() && Location == EWwiseMetadataMediaLocation::Memory && bStreaming))
 	{
 		Loader.Fail(TEXT("!Path+Streaming"));
 	}
-	else if (UNLIKELY(!Path.IsEmpty() && Location == EWwiseMetadataMediaLocation::Memory && !bStreaming))
+	else if (UNLIKELY(!Path.IsNone() && Location == EWwiseMetadataMediaLocation::Memory && !bStreaming))
 	{
 		Loader.Fail(TEXT("Path+Memory"));
 	}

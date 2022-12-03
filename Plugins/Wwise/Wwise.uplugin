@@ -1,26 +1,24 @@
 {
-	"FileVersion" : 1,
-	
-	"FriendlyName" : "Wwise Unreal Engine Integration",
-	"Version" : 202212398,
-	"VersionName" : "2022.1.0.7985.2398",
-	"CreatedBy" : "Audiokinetic, Inc.",
-	"CreatedByURL" : "http://audiokinetic.com",
-	"EngineVersion" : "5.0.0",
-	"Description" : "Wwise integration for Unreal Engine",
-	"Category" : "Audio",
-	"EnabledByDefault" : true,
-	
+	"FileVersion": 1,
+	"FriendlyName": "Wwise Unreal Engine Integration",
+	"Version": 202212495,
+	"VersionName": "2022.1.0.8070.2495",
+	"CreatedBy": "Audiokinetic, Inc.",
+	"CreatedByURL": "http://audiokinetic.com",
+	"EngineVersion": "5.0.0",
+	"Description": "Wwise integration for Unreal Engine",
+	"Category": "Audio",
+	"EnabledByDefault": true,
 	"Modules": [
 		{
 			"Name": "AkAudioMixer",
-			"Type": "Runtime",
-			"LoadingPhase": "Default"
+			"Type": "ClientOnly",
+			"LoadingPhase": "None"
 		},
 		{
 			"Name": "AkAudio",
-			"Type": "Runtime",
-			"LoadingPhase": "Default"
+			"Type": "ClientOnly",
+			"LoadingPhase": "PreLoadingScreen"
 		},
 		{
 			"Name": "AudiokineticTools",
@@ -29,36 +27,40 @@
 		},
 		{
 			"Name": "WwiseFileHandler",
-			"Type": "Runtime",
-			"LoadingPhase": "Default"
+			"Type": "ClientOnly",
+			"LoadingPhase": "None"
 		},
 		{
 			"Name": "WwiseProjectDatabase",
-			"Type": "Editor",
-			"LoadingPhase": "PostEngineInit"
+			"Type": "UncookedOnly",
+			"LoadingPhase": "None"
 		},
 		{
 			"Name": "WwiseResourceCooker",
-			"Type": "Editor",
-			"LoadingPhase": "Default"
+			"Type": "UncookedOnly",
+			"LoadingPhase": "None"
 		},
 		{
 			"Name": "WwiseResourceLoader",
-			"Type": "Runtime",
-			"LoadingPhase": "Default"
+			"Type": "ClientOnly",
+			"LoadingPhase": "None"
 		},
 		{
 			"Name": "WwiseSoundEngine",
-			"Type": "Runtime",
-			"LoadingPhase": "Default"
+			"Type": "ClientOnly",
+			"LoadingPhase": "None"
+		},
+		{
+			"Name": "WwiseSoundEngine_2022_1",
+			"Type": "ClientOnly",
+			"LoadingPhase": "None"
 		},
 		{
 			"Name": "WwiseSimpleExternalSource",
-			"Type": "Runtime",
-			"LoadingPhase": "Default"
+			"Type": "ClientOnly",
+			"LoadingPhase": "None"
 		}
 	],
-	
 	"Plugins":
 	[
 		{
@@ -66,6 +68,6 @@
 			"Enabled": true
 		}
 	],
-	
+
 	"CanContainContent" : true
 }

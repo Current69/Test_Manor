@@ -1,18 +1,19 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
-Copyright (c) 2021 Audiokinetic Inc.
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
+Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
-
 
 /*=============================================================================
 	AkLateReverbComponent.cpp:
@@ -497,10 +498,10 @@ FText UAkLateReverbComponent::GetValuesLabels() const
 		reflectionTimeString = FString("RTPC not in use");
 		if (ReverbDescriptor.ShouldEstimatePredelay())
 		{
-			reflectionTimeString = FText::AsNumber(TimeToFirstReflection, &NumberFormat).ToString() + " seconds";
-			if (TimeToFirstReflection < 0.1f)
+			reflectionTimeString = FText::AsNumber(TimeToFirstReflection, &NumberFormat).ToString() + " ms";
+			if (TimeToFirstReflection > 100.0f)
 			{
-				reflectionTimeString = FText::AsNumber(TimeToFirstReflection * 1000.0f, &NumberFormat).ToString() + "ms";
+				reflectionTimeString = FText::AsNumber(TimeToFirstReflection / 1000.0f, &NumberFormat).ToString() + " s";
 			}
 		}
 		dampingString = "No associated geometry component.";
@@ -519,7 +520,13 @@ void UAkLateReverbComponent::InitTextVisualizers()
 	{
 		if (ReverbDescriptor.RequiresUpdates())
 		{
-			FString TextVizName = GetOwner()->GetName() + GetName();
+			FString OwnerName;
+#if WITH_EDITOR
+			OwnerName = GetOwner()->GetActorLabel();
+#else
+			OwnerName = GetOwner()->GetName();
+#endif
+			FString TextVizName = OwnerName + GetName();
 			UMaterialInterface* mat = Cast<UMaterialInterface>(FAkAudioStyle::GetAkForegroundTextMaterial());
 			if (!IsValid(TextVisualizerLabels))
 			{
@@ -864,7 +871,13 @@ bool UAkLateReverbComponent::EncompassesPoint(FVector Point, float SphereRadius/
 	}
 	FString actorString = FString("NONE");
 	if (GetOwner() != nullptr)
+	{
+#if WITH_EDITOR
+		actorString = GetOwner()->GetActorLabel();
+#else
 		actorString = GetOwner()->GetName();
+#endif
+	}
 	UE_LOG(LogAkAudio, Error, TEXT("UAkLateReverbComponent::EncompassesPoint : Error. In actor %s, AkLateReverbComponent %s has an invalid Parent."), *actorString, *GetName());
 	return false;
 }

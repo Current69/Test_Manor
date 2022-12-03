@@ -1,18 +1,19 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
-Copyright (c) 2021 Audiokinetic Inc.
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
+Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
-
 
 #include "AkAssetFactories.h"
 
@@ -40,28 +41,98 @@ struct AkAssetFactory_Helper
 	};
 
 	template<typename AkAssetType = UAkAudioType>
-	static UObject* FactoryCreateNew(UClass* Class, UObject* InParent, const FName& Name, EObjectFlags Flags, FGuid AssetID = FGuid{}, uint32 ShortID = 0)
+	static UObject* FactoryCreateNew(UClass* Class, UObject* InParent, const FName& Name, EObjectFlags Flags, FGuid AssetID = FGuid{}, uint32 ShortID = AK_INVALID_UNIQUE_ID, FString WwiseObjectName = "")
 	{
-		auto AkSettingsPerUser = GetDefault<UAkSettingsPerUser>();
 		auto ContainingPath = InParent->GetName();
 
-		auto newObject = NewObject<AkAssetType>(InParent, Name, Flags);
-		FWwiseBasicInfo* Info = newObject->GetInfoMutable();
-		Info->AssetGuid = AssetID;
-		Info->AssetName = Name.ToString();
-		Info->AssetShortId = FAkAudioDevice::GetShortID(nullptr, Name.ToString());
-		
+		auto NewWwiseObject = NewObject<AkAssetType>(InParent, Name, Flags);
+		FWwiseObjectInfo* Info = NewWwiseObject->GetInfoMutable();
+		Info->WwiseGuid = AssetID;
+		if (WwiseObjectName.IsEmpty())
+		{
+			Info->WwiseName = Name;
+		}
+		else
+		{
+			Info->WwiseName = FName(WwiseObjectName);
+		}
+		if (ShortID == AK_INVALID_UNIQUE_ID)
+		{
+			Info->WwiseShortId = FAkAudioDevice::GetShortID(nullptr, Name.ToString());
+		}
+		else
+		{
+			Info->WwiseShortId = ShortID;
+		}
+		NewWwiseObject->MarkPackageDirty();
+		if(NewWwiseObject->bAutoLoad)
+		{
+			NewWwiseObject->LoadData();
+		}
+		return NewWwiseObject;
+	}
 
-		newObject->MarkPackageDirty();
-		newObject->LoadData();
-		return newObject;
+	template<typename AkAssetType = UAkGroupValue>
+	static UObject* FactoryCreateNewGroupValue(UClass* Class, UObject* InParent, const FName& Name, EObjectFlags Flags, FGuid AssetID = FGuid{}, uint32 ShortID = AK_INVALID_UNIQUE_ID, FString WwiseObjectName = "")
+	{
+		auto ContainingPath = InParent->GetName();
+
+		AkAssetType* NewStateValue = NewObject<AkAssetType>(InParent, Name, Flags);
+		FWwiseGroupValueInfo* Info = static_cast<FWwiseGroupValueInfo*>(NewStateValue->GetInfoMutable());
+		Info->WwiseGuid = AssetID;
+
+		FString StringName = Name.ToString();
+		FString ValueName = StringName;
+		FString GroupName;
+		if (StringName.Contains(TEXT("-")))
+		{
+			StringName.Split(TEXT("-"), &GroupName, &ValueName);
+		}
+
+		if (WwiseObjectName.IsEmpty() && ValueName.IsEmpty())
+		{
+			Info->WwiseName = FName(StringName);
+		}
+		else if (WwiseObjectName.IsEmpty())
+		{
+			Info->WwiseName = FName(ValueName);
+		}
+		else
+		{
+			Info->WwiseName = FName(WwiseObjectName);
+		}
+
+
+		if (ShortID == AK_INVALID_UNIQUE_ID)
+		{
+			Info->WwiseShortId = FAkAudioDevice::GetShortID(nullptr, Info->WwiseName.ToString());
+		}
+		else
+		{
+			Info->WwiseShortId = ShortID;
+		}
+		if (!GroupName.IsEmpty())
+		{
+			Info->GroupShortId = FAkAudioDevice::GetShortID(nullptr, GroupName);
+		}
+		else
+		{
+			Info->GroupShortId = AK_INVALID_UNIQUE_ID;
+			UE_LOG(LogAkAudio, Warning, TEXT("FactoryCreateNewGroupValue: New Group Value asset '%s' in '%s' will have an invalid group ID, please set the group ID manually."), *StringName, *InParent->GetPathName());
+		}
+		NewStateValue->MarkPackageDirty();
+		if(NewStateValue->bAutoLoad)
+		{
+			NewStateValue->LoadData();
+		}
+		return NewStateValue;
 	}
 
 	template<typename AkAssetType>
 	static bool CanCreateNew()
 	{
-		const UAkSettings* akSettings = GetDefault<UAkSettings>();
-		if (akSettings)
+		const UAkSettings* AkSettings = GetDefault<UAkSettings>();
+		if (AkSettings)
 		{
 			return true;
 		}
@@ -89,7 +160,7 @@ UAkAcousticTextureFactory::UAkAcousticTextureFactory(const class FObjectInitiali
 
 UObject* UAkAcousticTextureFactory::FactoryCreateNew(UClass* Class, UObject* InParent, FName Name, EObjectFlags Flags, UObject* Context, FFeedbackContext* Warn)
 {
-	return AkAssetFactory_Helper::FactoryCreateNew<UAkAcousticTexture>(Class, InParent, Name, Flags, AssetID, ShortID);
+	return AkAssetFactory_Helper::FactoryCreateNew<UAkAcousticTexture>(Class, InParent, Name, Flags, AssetID, ShortID, WwiseObjectName);
 }
 
 bool UAkAcousticTextureFactory::CanCreateNew() const
@@ -109,7 +180,7 @@ UAkAudioEventFactory::UAkAudioEventFactory(const class FObjectInitializer& Objec
 
 UObject* UAkAudioEventFactory::FactoryCreateNew(UClass* Class, UObject* InParent, FName Name, EObjectFlags Flags, UObject* Context, FFeedbackContext* Warn)
 {
-	return AkAssetFactory_Helper::FactoryCreateNew<UAkAudioEvent>(Class, InParent, Name, Flags, AssetID, ShortID);
+	return AkAssetFactory_Helper::FactoryCreateNew<UAkAudioEvent>(Class, InParent, Name, Flags, AssetID, ShortID, WwiseObjectName);
 }
 
 bool UAkAudioEventFactory::CanCreateNew() const
@@ -129,7 +200,7 @@ UAkAuxBusFactory::UAkAuxBusFactory(const class FObjectInitializer& ObjectInitial
 
 UObject* UAkAuxBusFactory::FactoryCreateNew(UClass* Class, UObject* InParent, FName Name, EObjectFlags Flags, UObject* Context, FFeedbackContext* Warn)
 {
-	return AkAssetFactory_Helper::FactoryCreateNew<UAkAuxBus>(Class, InParent, Name, Flags, AssetID, ShortID);
+	return AkAssetFactory_Helper::FactoryCreateNew<UAkAuxBus>(Class, InParent, Name, Flags, AssetID, ShortID, WwiseObjectName);
 }
 
 bool UAkAuxBusFactory::CanCreateNew() const
@@ -149,7 +220,7 @@ UAkRtpcFactory::UAkRtpcFactory(const class FObjectInitializer& ObjectInitializer
 
 UObject* UAkRtpcFactory::FactoryCreateNew(UClass* Class, UObject* InParent, FName Name, EObjectFlags Flags, UObject* Context, FFeedbackContext* Warn)
 {
-	return AkAssetFactory_Helper::FactoryCreateNew<UAkRtpc>(Class, InParent, Name, Flags, AssetID, ShortID);
+	return AkAssetFactory_Helper::FactoryCreateNew<UAkRtpc>(Class, InParent, Name, Flags, AssetID, ShortID, WwiseObjectName);
 }
 
 bool UAkRtpcFactory::CanCreateNew() const
@@ -169,7 +240,7 @@ UAkTriggerFactory::UAkTriggerFactory(const class FObjectInitializer& ObjectIniti
 
 UObject* UAkTriggerFactory::FactoryCreateNew(UClass* Class, UObject* InParent, FName Name, EObjectFlags Flags, UObject* Context, FFeedbackContext* Warn)
 {
-	return AkAssetFactory_Helper::FactoryCreateNew<UAkTrigger>(Class, InParent, Name, Flags, AssetID, ShortID);
+	return AkAssetFactory_Helper::FactoryCreateNew<UAkTrigger>(Class, InParent, Name, Flags, AssetID, ShortID, WwiseObjectName);
 }
 
 bool UAkTriggerFactory::CanCreateNew() const
@@ -189,7 +260,7 @@ UAkStateValueFactory::UAkStateValueFactory(const class FObjectInitializer& Objec
 
 UObject* UAkStateValueFactory::FactoryCreateNew(UClass* Class, UObject* InParent, FName Name, EObjectFlags Flags, UObject* Context, FFeedbackContext* Warn)
 {
-	return AkAssetFactory_Helper::FactoryCreateNew<UAkStateValue>(Class, InParent, Name, Flags, AssetID, ShortID);
+	return AkAssetFactory_Helper::FactoryCreateNewGroupValue<UAkStateValue>(Class, InParent, Name, Flags, AssetID, ShortID, WwiseObjectName);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -204,7 +275,7 @@ UAkSwitchValueFactory::UAkSwitchValueFactory(const class FObjectInitializer& Obj
 
 UObject* UAkSwitchValueFactory::FactoryCreateNew(UClass* Class, UObject* InParent, FName Name, EObjectFlags Flags, UObject* Context, FFeedbackContext* Warn)
 {
-	return AkAssetFactory_Helper::FactoryCreateNew<UAkSwitchValue>(Class, InParent, Name, Flags, AssetID, ShortID);
+	return AkAssetFactory_Helper::FactoryCreateNewGroupValue<UAkSwitchValue>(Class, InParent, Name, Flags, AssetID, ShortID, WwiseObjectName);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -219,5 +290,5 @@ UAkEffectShareSetFactory::UAkEffectShareSetFactory(const class FObjectInitialize
 
 UObject* UAkEffectShareSetFactory::FactoryCreateNew(UClass* Class, UObject* InParent, FName Name, EObjectFlags Flags, UObject* Context, FFeedbackContext* Warn)
 {
-	return AkAssetFactory_Helper::FactoryCreateNew<UAkEffectShareSet>(Class, InParent, Name, Flags, AssetID, ShortID);
+	return AkAssetFactory_Helper::FactoryCreateNew<UAkEffectShareSet>(Class, InParent, Name, Flags, AssetID, ShortID, WwiseObjectName);
 }

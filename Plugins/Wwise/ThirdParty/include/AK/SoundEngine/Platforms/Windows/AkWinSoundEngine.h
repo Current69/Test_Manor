@@ -37,6 +37,7 @@ the specific language governing permissions and limitations under the License.
 
 struct IXAudio2;
 
+/// \cond !(Web)
 /// Platform specific initialization settings
 /// \sa AK::SoundEngine::Init
 /// \sa AK::SoundEngine::GetDefaultPlatformInitSettings
@@ -44,11 +45,11 @@ struct IXAudio2;
 struct AkPlatformInitSettings
 {
     // Direct sound.
-    HWND			    hWnd;					///< Handle to the window associated to the audio.
+    HWND			    hWnd;					///< Handle of the window associated with the audio.
 												///< Each game must specify the HWND of the application for device detection purposes.
 												///< The value returned by GetDefaultPlatformInitSettings is the foreground HWND at 
-												///< the moment of the initialization of the sound engine and may not be the correct one for your game.
-												///< It is required that each game provides the correct HWND to be used.
+												///< the moment of the initialization of the sound engine and might not be the correct one for your game.
+												///< Each game must provide the correct HWND to use.
 									
 
     // Threading model.
@@ -66,6 +67,7 @@ struct AkPlatformInitSettings
 
 	AkUInt32			uMaxSystemAudioObjects; ///< Dictates how many Microsoft Spatial Sound dynamic objects will be reserved by the System sink. On Windows, other running processes will be prevented from reserving these objects. Set to 0 to disable the use of System Audio Objects. Default is 128.
 };
+/// \endcond
 
 struct IDirectSound8;
 struct IXAudio2;

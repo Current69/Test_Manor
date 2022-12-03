@@ -275,8 +275,6 @@ namespace AK
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_AmbisonicNotAvailable"), AKTEXT("Ambisonic is only available with 3D audio. 3D audio is not enabled in the audio device shareset, reverting to standard configuration.")),
 
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_NoAudioDevice"), AKTEXT("No audio device found on system.")),
-			ERROR_CODE_DEF(AKTEXT("ErrorCode_PreConnectionError"), AKTEXT("Some errors occured pre-connection, listed below:")),
-			ERROR_CODE_DEF(AKTEXT("ErrorCode_EndPreConnectionError"), AKTEXT("End of pre-connection errors.")),
 
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_Support"), AKTEXT("Internal error, contact Support with this information: %s")),
 			ERROR_CODE_DEF(AKTEXT("ErrorCode_ReplayMessage"), AKTEXT("Replay: %s")),

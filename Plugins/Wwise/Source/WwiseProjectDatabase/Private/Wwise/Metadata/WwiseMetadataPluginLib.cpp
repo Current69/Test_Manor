@@ -1,15 +1,17 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
 Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
@@ -24,30 +26,30 @@ FWwiseMetadataPluginLibAttributes::FWwiseMetadataPluginLibAttributes(FWwiseMetad
 	DLL(Loader.GetString(this, TEXT("DLL"), EWwiseRequiredMetadata::Optional)),
 	StaticLib(Loader.GetString(this, TEXT("StaticLib"), EWwiseRequiredMetadata::Optional))
 {
-	Loader.LogParsed(TEXT("PluginLibAttributes"), LibId, *LibName);
+	Loader.LogParsed(TEXT("PluginLibAttributes"), LibId, LibName);
 }
 
-EWwiseMetadataPluginLibType FWwiseMetadataPluginLibAttributes::TypeFromString(const FString& TypeString)
+EWwiseMetadataPluginLibType FWwiseMetadataPluginLibAttributes::TypeFromString(const FName& TypeString)
 {
-	if (TypeString.Equals(TEXT("Effect")))
+	if (TypeString == "Effect")
 	{
 		return EWwiseMetadataPluginLibType::Effect;
 	}
-	else if (TypeString.Equals(TEXT("Source")))
+	else if (TypeString == "Source")
 	{
 		return EWwiseMetadataPluginLibType::Source;
 	}
-	else if (TypeString.Equals(TEXT("AudioDevice")))
+	else if (TypeString == "AudioDevice")
 	{
 		return EWwiseMetadataPluginLibType::AudioDevice;
 	}
-	else if (TypeString.Equals(TEXT("Metadata")))
+	else if (TypeString == "Metadata")
 	{
 		return EWwiseMetadataPluginLibType::Metadata;
 	}
 	else
 	{
-		UE_LOG(LogWwiseProjectDatabase, Warning, TEXT("FWwiseMetadataPluginLibAttributes: Unknown Type: %s"), *TypeString);
+		UE_LOG(LogWwiseProjectDatabase, Warning, TEXT("FWwiseMetadataPluginLibAttributes: Unknown Type: %s"), *TypeString.ToString());
 		return EWwiseMetadataPluginLibType::Unknown;
 	}
 }
@@ -55,5 +57,5 @@ EWwiseMetadataPluginLibType FWwiseMetadataPluginLibAttributes::TypeFromString(co
 FWwiseMetadataPluginLib::FWwiseMetadataPluginLib(FWwiseMetadataLoader& Loader) :
 	FWwiseMetadataPluginLibAttributes(Loader)
 {
-	Loader.LogParsed(TEXT("PluginLib"), LibId, *LibName);
+	Loader.LogParsed(TEXT("PluginLib"), LibId, LibName);
 }

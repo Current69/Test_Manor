@@ -1,15 +1,17 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
 Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
@@ -21,7 +23,7 @@ Copyright (c) 2022 Audiokinetic Inc.
 #include "Wwise/Ref/WwiseRefCustomPlugin.h"
 #include "Wwise/Ref/WwiseRefExternalSource.h"
 #include "Wwise/Ref/WwiseRefMedia.h"
-#include "Wwise/Ref/WwiseRefPluginShareset.h"
+#include "Wwise/Ref/WwiseRefPluginShareSet.h"
 #include "Wwise/Ref/WwiseRefState.h"
 #include "Wwise/WwiseProjectDatabaseModule.h"
 #include "Wwise/Ref/WwiseRefSwitch.h"
@@ -158,15 +160,15 @@ WwiseCustomPluginIdsMap FWwiseRefSwitchContainer::GetCustomPlugins(const WwiseCu
 	return Result;
 }
 
-WwisePluginSharesetIdsMap FWwiseRefSwitchContainer::GetPluginSharesets(const WwisePluginSharesetGlobalIdsMap& GlobalMap) const
+WwisePluginShareSetIdsMap FWwiseRefSwitchContainer::GetPluginShareSets(const WwisePluginShareSetGlobalIdsMap& GlobalMap) const
 {
 	const auto* SwitchContainer = GetSwitchContainer();
 	if (!SwitchContainer || !SwitchContainer->PluginRefs)
 	{
 		return {};
 	}
-	const auto& Plugins = SwitchContainer->PluginRefs->Sharesets;
-	WwisePluginSharesetIdsMap Result;
+	const auto& Plugins = SwitchContainer->PluginRefs->ShareSets;
+	WwisePluginShareSetIdsMap Result;
 	Result.Empty(Plugins.Num());
 	for (const auto& Elem : Plugins)
 	{

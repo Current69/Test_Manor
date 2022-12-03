@@ -1,15 +1,17 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
 Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
@@ -24,6 +26,7 @@ Copyright (c) 2022 Audiokinetic Inc.
 
 #include "Wwise/Stats/AsyncStats.h"
 
+#include "AkUEFeatures.h"
 #include "AkUnrealHelper.h"
 
 #include "Async/Async.h"
@@ -72,7 +75,7 @@ AKRESULT FWwiseIOHookImpl::Open(
 	AkFileDesc&				out_fileDesc
 )
 {
-	io_bSyncOpen = true;	// This can be run on any thread.
+	io_bSyncOpen = true;	// Do it now.
 
 	const FString Filename(in_pszFileName);
 
@@ -94,8 +97,6 @@ AKRESULT FWwiseIOHookImpl::Open(
 	AkFileDesc&				out_fileDesc        // Returned file descriptor.
 )
 {
-	io_bSyncOpen = true;	// This can be run on any thread.
-
 	if (in_eOpenMode != AK_OpenModeRead || !in_pFlags)
 	{
 		ASYNC_INC_DWORD_STAT(STAT_WwiseFileHandlerTotalErrorCount);
@@ -111,17 +112,24 @@ AKRESULT FWwiseIOHookImpl::Open(
 		return AK_NotInitialized;
 	}
 
-	UE_LOG(LogWwiseFileHandler, Verbose, TEXT("Opening file for streaming: File ID %" PRIu32), in_fileID);
-	const auto AkResult = StreamingHooks->OpenStreaming(out_fileDesc, in_fileID);
+	AKRESULT AkResult;
+	if (io_bSyncOpen)
+	{
+		UE_LOG(LogWwiseFileHandler, VeryVerbose, TEXT("Retrieving file open result: File ID %" PRIu32), in_fileID);
+		AkResult = StreamingHooks->GetOpenStreamingResult(out_fileDesc, in_fileID);
+	}
+	else
+	{
+		UE_LOG(LogWwiseFileHandler, VeryVerbose, TEXT("Opening file for streaming: File ID %" PRIu32), in_fileID);
+		AkResult = StreamingHooks->OpenStreaming(out_fileDesc, in_fileID);
+	}
 	if (UNLIKELY(AkResult != AK_Success))
 	{
 		ASYNC_INC_DWORD_STAT(STAT_WwiseFileHandlerTotalErrorCount);
 		UE_LOG(LogWwiseFileHandler, Error, TEXT("Streaming Open failed for File ID %" PRIu32 ": %" PRIi32 " (%s)"), in_fileID, AkResult, AkUnrealHelper::GetResultString(AkResult));
-		return AK_NotImplemented;
 	}
 
-	ASYNC_INC_DWORD_STAT(STAT_WwiseFileHandlerOpenedStreams);
-	return AK_Success;
+	return AkResult;
 }
 
 AKRESULT FWwiseIOHookImpl::Read(
@@ -143,7 +151,7 @@ AKRESULT FWwiseIOHookImpl::Read(
 #endif
 
 	auto* FileState = FWwiseStreamableFileStateInfo::GetFromFileDesc(in_fileDesc);
-	if (!FileState)
+	if (UNLIKELY(!FileState))
 	{
 		UE_LOG(LogWwiseFileHandler, Warning, TEXT("IOHook::Read: Could not find File Descriptor"));
 		ASYNC_INC_DWORD_STAT(STAT_WwiseFileHandlerTotalErrorCount);
@@ -152,6 +160,17 @@ AKRESULT FWwiseIOHookImpl::Read(
 		--CurrentDeviceData;
 #endif
 		return AK_IDNotFound;
+	}
+
+	if (UNLIKELY(!FileState->CanProcessFileOp()))
+	{
+		UE_LOG(LogWwiseFileHandler, Verbose, TEXT("IOHook::Read: FileState is not properly initialized for reading"));
+		ASYNC_INC_DWORD_STAT(STAT_WwiseFileHandlerTotalErrorCount);
+		ASYNC_DEC_DWORD_STAT(STAT_WwiseFileHandlerPendingRequests);
+#ifndef AK_OPTIMIZED
+		--CurrentDeviceData;
+#endif
+		return AK_UnknownFileError;
 	}
 
 	UE_LOG(LogWwiseFileHandler, VeryVerbose, TEXT("IOHook::Read: Reading %" PRIu32 " bytes @ %" PRIu64 " - Priority %" PRIi8 " Deadline %f"), io_transferInfo.uRequestedSize, io_transferInfo.uFilePosition, in_heuristics.priority, (double)in_heuristics.fDeadline);
@@ -249,6 +268,12 @@ void FWwiseIOHookImpl::Cancel(
 
 AKRESULT FWwiseIOHookImpl::Close(AkFileDesc& in_fileDesc)
 {
+	if (UNLIKELY(IsEngineExitRequested()))
+	{
+		UE_LOG(LogWwiseFileHandler, Log, TEXT("Not closing file while engine is exiting."));
+		return AK_Success;
+	}
+
 	auto* FileState = FWwiseStreamableFileStateInfo::GetFromFileDesc(in_fileDesc);
 	if (!FileState)
 	{
@@ -259,7 +284,6 @@ AKRESULT FWwiseIOHookImpl::Close(AkFileDesc& in_fileDesc)
 
 	UE_LOG(LogWwiseFileHandler, VeryVerbose, TEXT("Closing streaming file"));
 	FileState->CloseStreaming();
-	ASYNC_DEC_DWORD_STAT(STAT_WwiseFileHandlerOpenedStreams);
 	return AK_Success;
 }
 
@@ -346,6 +370,5 @@ AKRESULT FWwiseIOHookImpl::OpenFileForWrite(const AkOSChar* in_pszFileName, AkOp
 
 	auto* WriteState = new FWwiseWriteFileState(FileHandle, FullPath);
 	WriteState->GetFileDescCopy(out_fileDesc);
-	ASYNC_INC_DWORD_STAT(STAT_WwiseFileHandlerOpenedStreams);
 	return AK_Success;
 }

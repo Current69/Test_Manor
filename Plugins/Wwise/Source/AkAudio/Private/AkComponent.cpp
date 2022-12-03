@@ -1,18 +1,19 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
-Copyright (c) 2021 Audiokinetic Inc.
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
+Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
-
 
 /*=============================================================================
 	AkComponent.cpp:
@@ -35,8 +36,9 @@ Copyright (c) 2021 Audiokinetic Inc.
 #include "Engine/Texture2D.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
-#include "Wwise/LowLevel/WwiseLowLevelSoundEngine.h"
-#include "Wwise/LowLevel/WwiseLowLevelSpatialAudio.h"
+#include "Wwise/WwiseExternalSourceManager.h"
+#include "Wwise/API/WwiseSoundEngineAPI.h"
+#include "Wwise/API/WwiseSpatialAudioAPI.h"
 
 #if WITH_EDITOR
 #include "LevelEditorViewport.h"
@@ -242,16 +244,16 @@ AkPlayingID UAkComponent::PostAkEventByNameWithDelegate(UAkAudioEvent* AkEvent, 
 {
 	AkPlayingID PlayingID = AK_INVALID_PLAYING_ID;
 
+	if (AkEvent)
+	{
+		return AkEvent->PostOnComponent(this, PostEventCallback, CallbackMask, StopWhenOwnerDestroyed);
+	}
+
 	auto AudioDevice = FAkAudioDevice::Get();
 	if (AudioDevice)
 	{
-		TArray<AkExternalSourceInfo> ExternalSources;
-		if (AkEvent)
-		{
-			IWwiseExternalSourceManager::Get()->GetExternalSourceInfos(ExternalSources, AkEvent->GetExternalSources());
-		}
 		const AkUInt32 ShortID = AudioDevice->GetShortID(AkEvent, in_EventName);
-		PlayingID = AudioDevice->PostEventOnAkGameObject(ShortID, this, PostEventCallback, CallbackMask, ExternalSources);
+		PlayingID = AudioDevice->PostEventOnAkGameObject(ShortID, this, PostEventCallback, CallbackMask, {});
 		if (PlayingID != AK_INVALID_PLAYING_ID)
 		{
 			bStarted = true;
@@ -279,27 +281,34 @@ AkPlayingID UAkComponent::PostAkEventByIdWithCallback(const AkUInt32 EventShortI
 
 int32 UAkComponent::PostAkEventAndWaitForEnd(class UAkAudioEvent * AkEvent, const FString& in_EventName, FLatentActionInfo LatentInfo)
 {
-	AkPlayingID PlayingID = AK_INVALID_PLAYING_ID;
-
-	if (AkEvent == NULL && in_EventName.IsEmpty())
+	if (LIKELY(!AkEvent))
 	{
-		UE_LOG(LogAkAudio, Warning, TEXT("UAkComponent::PostAkEventAndWaitForEnd: No Event specified!"));
-		return AK_INVALID_PLAYING_ID;
+		return AkEvent->PostOnComponentAndWait(this, StopWhenOwnerDestroyed, LatentInfo);
 	}
 
-	auto AudioDevice = FAkAudioDevice::Get();
-	auto CurrentWorld = GetWorld();
-	if (AudioDevice && CurrentWorld)
-	{
-		FLatentActionManager& LatentActionManager = CurrentWorld->GetLatentActionManager();
-		FWaitEndOfEventAction* NewAction =  new FWaitEndOfEventAction(LatentInfo);
-		LatentActionManager.AddNewAction(LatentInfo.CallbackTarget, LatentInfo.UUID, NewAction);
-		AkUInt32 ShortId = AudioDevice->GetShortID(AkEvent, in_EventName);
-		PlayingID = AudioDevice->PostEventOnComponentWithLatentAction(ShortId, this, NewAction);
+	AkPlayingID PlayingID = AK_INVALID_PLAYING_ID;
 
-		if (PlayingID == AK_INVALID_PLAYING_ID)
+	auto AudioDevice = FAkAudioDevice::Get();
+	if (AudioDevice)
+	{
+		const AkUInt32 ShortID = AudioDevice->GetShortID(AkEvent, in_EventName);
+		auto* World = GetWorld();
+		if (UNLIKELY(!World))
 		{
-			NewAction->EventFinished = true;
+			UE_LOG(LogAkAudio, Log, TEXT("Failed to post latent AkAudioEvent with actor '%s' world that's not valid."), *GetName());
+			return AK_INVALID_PLAYING_ID;
+		}
+		FLatentActionManager& LatentActionManager = World->GetLatentActionManager();
+		FWaitEndOfEventAction* LatentAction = new FWaitEndOfEventAction(LatentInfo);
+		LatentActionManager.AddNewAction(LatentInfo.CallbackTarget, LatentInfo.UUID, LatentAction);
+		PlayingID = AudioDevice->PostEventOnComponentWithLatentAction(ShortID, this, LatentAction);
+		if (PlayingID != AK_INVALID_PLAYING_ID)
+		{
+			bStarted = true;
+		}
+		else
+		{
+			LatentAction->EventFinished = true;
 		}
 	}
 
@@ -315,19 +324,40 @@ void UAkComponent::PostAkEventAndWaitForEndAsync(UAkAudioEvent* AkEvent, int32& 
 		return;
 	}
 
-	AkDeviceAndWorld deviceAndWorld(this);
-	if (deviceAndWorld.IsValid())
-	{
-		FLatentActionManager& LatentActionManager = deviceAndWorld.CurrentWorld->GetLatentActionManager();
-		FWaitEndOfEventAsyncAction* NewAction = LatentActionManager.FindExistingAction<FWaitEndOfEventAsyncAction>(LatentInfo.CallbackTarget, LatentInfo.UUID);
-		if (!NewAction)
-		{
-			NewAction = new FWaitEndOfEventAsyncAction(LatentInfo, &PlayingID);
-			LatentActionManager.AddNewAction(LatentInfo.CallbackTarget, LatentInfo.UUID, NewAction);
+	PlayingID = AkEvent->PostOnComponentAndWait(this, StopWhenOwnerDestroyed, LatentInfo);
+}
 
-			NewAction->FuturePlayingID = deviceAndWorld.AkAudioDevice->PostAkAudioEventWithLatentActionOnAkComponentAsync(AkEvent, this, NewAction);
-		}
+int32 UAkComponent::PostAkEvent(UAkAudioEvent* AkEvent, int32 CallbackMask,
+	const FOnAkPostEventCallback& PostEventCallback, const FString& InEventName)
+{
+	if (LIKELY(IsValid(AkEvent)))
+	{
+		return AkEvent->PostOnComponent(this, PostEventCallback, CallbackMask, StopWhenOwnerDestroyed);
 	}
+
+	AkPlayingID playingID = AK_INVALID_PLAYING_ID;
+
+	auto AudioDevice = FAkAudioDevice::Get();
+	if (AudioDevice)
+	{
+		playingID = AudioDevice->PostEventOnAkGameObject(AudioDevice->GetShortID(AkEvent, InEventName), this, PostEventCallback, CallbackMask, {});
+		if (playingID != AK_INVALID_PLAYING_ID)
+			bStarted = true;
+	}
+	
+	return playingID;
+
+}
+
+AkPlayingID UAkComponent::PostAkEvent(UAkAudioEvent* AkEvent, AkUInt32 Flags, AkCallbackFunc UserCallback,
+	void* UserCookie)
+{
+	if (UNLIKELY(!IsValid(AkEvent)))
+	{
+		UE_LOG(LogAkAudio, Error, TEXT("Failed to post invalid AkAudioEvent on component '%s'."), *GetName());
+		return AK_INVALID_PLAYING_ID;
+	}
+	return AkEvent->PostOnComponent(this, nullptr, UserCallback, UserCookie, static_cast<AkCallbackType>(Flags), nullptr, StopWhenOwnerDestroyed);
 }
 
 AkRoomID UAkComponent::GetSpatialAudioRoom() const
@@ -344,7 +374,7 @@ void UAkComponent::PostTrigger(const UAkTrigger* TriggerValue, FString Trigger)
 {
 	if (FAkAudioDevice::Get())
 	{
-		auto* SoundEngine = FWwiseLowLevelSoundEngine::Get();
+		auto* SoundEngine = IWwiseSoundEngineAPI::Get();
 		if (UNLIKELY(!SoundEngine)) return;
 
 		if (TriggerValue)
@@ -362,7 +392,7 @@ void UAkComponent::SetSwitch(const UAkSwitchValue* SwitchValue, FString SwitchGr
 {
 	if (FAkAudioDevice::Get())
 	{
-		auto* SoundEngine = FWwiseLowLevelSoundEngine::Get();
+		auto* SoundEngine = IWwiseSoundEngineAPI::Get();
 		if (UNLIKELY(!SoundEngine)) return;
 
 		if (SwitchValue)
@@ -478,9 +508,11 @@ void UAkComponent::OnRegister()
 		if (EarlyReflectionAuxBus || !EarlyReflectionAuxBusName.IsEmpty())
 		{
 			AkUInt32 AuxBusID = FAkAudioDevice::GetShortID(EarlyReflectionAuxBus, EarlyReflectionAuxBusName);
-			AudioDevice->SetEarlyReflectionsAuxBus(this, AuxBusID);
+			if (AuxBusID != AK_INVALID_UNIQUE_ID)
+				AudioDevice->SetEarlyReflectionsAuxBus(this, AuxBusID);
 		}
-		AudioDevice->SetEarlyReflectionsVolume(this, EarlyReflectionBusSendGain);
+		if (EarlyReflectionBusSendGain != 1.0)
+			AudioDevice->SetEarlyReflectionsVolume(this, EarlyReflectionBusSendGain);
 	}
 
 	Super::OnRegister();
@@ -587,7 +619,7 @@ void UAkComponent::ApplyAkReverbVolumeList(float DeltaTime)
 
 void UAkComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction)
 {
-	auto* SoundEngine = FWwiseLowLevelSoundEngine::Get();
+	auto* SoundEngine = IWwiseSoundEngineAPI::Get();
 	if (UNLIKELY(!SoundEngine)) return;
 
 	if (SoundEngine->IsInitialized())
@@ -640,7 +672,7 @@ void UAkComponent::BeginPlay()
 	SetAttenuationScalingFactor(AttenuationScalingFactor);
 
 	if (EnableSpotReflectors)
-		AAkSpotReflector::SetSpotReflectors(this);
+		AAkSpotReflector::UpdateSpotReflectors(this);
 }
 
 void UAkComponent::SetAttenuationScalingFactor(float Value)
@@ -670,7 +702,13 @@ void UAkComponent::GetAkGameObjectName(FString& Name) const
 {
 	AActor* parentActor = GetOwner();
 	if (parentActor)
+	{
+#if WITH_EDITOR
+		Name = parentActor->GetActorLabel() + ".";
+#else
 		Name = parentActor->GetName() + ".";
+#endif
+	}
 
 	Name += GetName();
 
@@ -838,20 +876,24 @@ void UAkComponent::UpdateSpatialAudioRoom(FVector Location)
 		FAkAudioDevice* AkAudioDevice = FAkAudioDevice::Get();
 		if (AkAudioDevice)
 		{
+			AKRESULT result = AK_Fail;
 			TArray<UAkRoomComponent*> RoomComponents = AkAudioDevice->FindRoomComponentsAtLocation(Location, GetWorld());
 			if (RoomComponents.Num() == 0)
 			{
-				if (AkAudioDevice->WorldHasActiveRooms(GetWorld()))
+				if (AkAudioDevice->WorldHasActiveRooms(GetWorld()) && CurrentRoom != nullptr)
 				{
 					CurrentRoom = nullptr;
-					AkAudioDevice->SetInSpatialAudioRoom(GetAkGameObjectID(), GetSpatialAudioRoom());
+					result = AkAudioDevice->SetInSpatialAudioRoom(GetAkGameObjectID(), GetSpatialAudioRoom());
 				}
 			}
 			else if (CurrentRoom != RoomComponents[0])
 			{
 				CurrentRoom = RoomComponents[0];
-				AkAudioDevice->SetInSpatialAudioRoom(GetAkGameObjectID(), GetSpatialAudioRoom());
+				result = AkAudioDevice->SetInSpatialAudioRoom(GetAkGameObjectID(), GetSpatialAudioRoom());
 			}
+
+			if (EnableSpotReflectors && result == AK_Success)
+				AAkSpotReflector::UpdateSpotReflectors(this);
 		}
 	}
 }
@@ -1009,7 +1051,7 @@ void UAkComponent::_DebugDrawDiffraction(const AkVector64& akEmitterPos, const A
 
 void UAkComponent::DebugDrawReflections() const
 {
-	auto* SpatialAudio = FWwiseLowLevelSpatialAudio::Get();
+	auto* SpatialAudio = IWwiseSpatialAudioAPI::Get();
 	if (UNLIKELY(!SpatialAudio)) return;
 
 	enum { kMaxPaths = 64 };
@@ -1023,7 +1065,7 @@ void UAkComponent::DebugDrawReflections() const
 
 void UAkComponent::DebugDrawDiffraction() const
 {
-	auto* SpatialAudio = FWwiseLowLevelSpatialAudio::Get();
+	auto* SpatialAudio = IWwiseSpatialAudioAPI::Get();
 	if (UNLIKELY(!SpatialAudio)) return;
 
 	enum { kMaxPaths = 16 };
@@ -1050,6 +1092,15 @@ void UAkComponent::SetGameObjectRadius(float in_outerRadius, float in_innerRadiu
 	}
 }
 
+void UAkComponent::SetEnableSpotReflectors(bool in_enable)
+{
+	if (EnableSpotReflectors != in_enable)
+	{
+		EnableSpotReflectors = in_enable;
+		AAkSpotReflector::UpdateSpotReflectors(this);
+	}
+}
+
 #if WITH_EDITOR
 void UAkComponent::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
@@ -1063,6 +1114,13 @@ void UAkComponent::PostEditChangeProperty(FPropertyChangedEvent& PropertyChanged
 		{
 			if (innerRadius > outerRadius)
 				innerRadius = outerRadius;
+
+			SetGameObjectRadius(outerRadius, innerRadius);
+		}
+		if (PropertyChangedEvent.Property->GetFName() == GET_MEMBER_NAME_CHECKED(UAkComponent, EnableSpotReflectors) &&
+			PropertyChangedEvent.ChangeType == EPropertyChangeType::ValueSet)
+		{
+			AAkSpotReflector::UpdateSpotReflectors(this);
 		}
 	}
 }

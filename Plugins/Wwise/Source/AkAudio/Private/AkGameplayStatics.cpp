@@ -1,18 +1,19 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
-Copyright (c) 2021 Audiokinetic Inc.
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
+Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
-
 
 /*=============================================================================
 	AkAudioClasses.cpp:
@@ -24,7 +25,7 @@ Copyright (c) 2021 Audiokinetic Inc.
 #include "AkAudioEvent.h"
 #include "AkAudioType.h"
 #include "AkComponent.h"
-#include "AkEffectShareset.h"
+#include "AkEffectShareSet.h"
 #include "AkRtpc.h"
 #include "AkStateValue.h"
 #include "AkSwitchValue.h"
@@ -33,11 +34,14 @@ Copyright (c) 2021 Audiokinetic Inc.
 #include "EngineUtils.h"
 #include "AkAcousticPortal.h"
 #include "AkAuxBus.h"
-#include "Wwise/LowLevel/WwiseLowLevelSoundEngine.h"
+#include "Wwise/API/WwiseSoundEngineAPI.h"
 #include "Wwise/WwiseExternalSourceManager.h"
 
+#include "inttypes.h"
+#include "WwiseInitBankLoader/WwiseInitBankLoader.h"
+
+
 bool UAkGameplayStatics::m_bSoundEngineRecording = false;
-float UAkGameplayStatics::OcclusionScalingFactor = 1.0f;
 
 /*-----------------------------------------------------------------------------
 	UAkGameplayStatics.
@@ -88,61 +92,13 @@ bool UAkGameplayStatics::IsGame(UObject* WorldContextObject)
 	return WorldType == EWorldType::Game || WorldType == EWorldType::GamePreview || WorldType == EWorldType::PIE;
 }
 
-int32 UAkGameplayStatics::PostEventAttached(
-	  class UAkAudioEvent* AkEvent
-	, class AActor* Actor
-	, FName AttachPointName
-	, bool bStopWhenAttachedToDestroyed
-	, FString EventName
-)
+int32 UAkGameplayStatics::PostEvent(UAkAudioEvent* AkEvent, AActor* Actor, int32 CallbackMask,
+	const FOnAkPostEventCallback& PostEventCallback, bool bStopWhenAttachedToDestroyed,
+	FString EventName)
 {
-	if (AkEvent == NULL && EventName.IsEmpty())
+	if (LIKELY(IsValid(AkEvent)))
 	{
-		UE_LOG(LogAkAudio, Warning, TEXT("UAkGameplayStatics::PostEventAttached: No Event specified!"));
-		return AK_INVALID_PLAYING_ID;
-	}
-
-	if ( Actor == NULL )
-	{
-		UE_LOG(LogAkAudio, Warning, TEXT("UAkGameplayStatics::PostEventAttached: NULL Actor specified!"));
-		return AK_INVALID_PLAYING_ID;
-	}
-
-	AkDeviceAndWorld DeviceAndWorld(Actor);
-	if (UNLIKELY(!DeviceAndWorld.IsValid()))
-	{
-		return AK_INVALID_PLAYING_ID;
-	}
-
-	TArray<AkExternalSourceInfo> ExternalSources;
-	if (AkEvent)
-	{
-		IWwiseExternalSourceManager::Get()->GetExternalSourceInfos(ExternalSources, AkEvent->GetExternalSources());
-	}
-	AkUInt32 ShortId = DeviceAndWorld.AkAudioDevice->GetShortID(AkEvent, EventName);
-	AkPlayingID playingID = DeviceAndWorld.AkAudioDevice->PostEventOnActor(ShortId, Actor, 0, NULL, NULL, bStopWhenAttachedToDestroyed, ExternalSources);
-	return playingID;
-}
-
-int32 UAkGameplayStatics::PostEvent(
-	UAkAudioEvent* AkEvent
-	, AActor* Actor
-	, int32 CallbackMask
-	, const FOnAkPostEventCallback& PostEventCallback
-	, const TArray<FAkExternalSourceInfo>& InExternalSources
-	, bool bStopWhenAttachedToDestroyed, FString EventName
-)
-{
-	if (AkEvent == NULL && EventName.IsEmpty())
-	{
-		UE_LOG(LogAkAudio, Warning, TEXT("UAkGameplayStatics::PostAkAudioEvent: No Event specified!"));
-		return AK_INVALID_PLAYING_ID;
-	}
-
-	if (Actor == NULL)
-	{
-		UE_LOG(LogAkAudio, Warning, TEXT("UAkGameplayStatics::PostAkAudioEvent: NULL Actor specified!"));
-		return AK_INVALID_PLAYING_ID;
+		return AkEvent->PostOnActor(Actor, PostEventCallback, CallbackMask, bStopWhenAttachedToDestroyed);
 	}
 
 	AkDeviceAndWorld DeviceAndWorld(Actor);
@@ -151,65 +107,21 @@ int32 UAkGameplayStatics::PostEvent(
 		return AK_INVALID_PLAYING_ID;
 	}
 	
-	TArray<AkExternalSourceInfo> ExternalSourceInfos;
-	if (AkEvent)
-	{
-		IWwiseExternalSourceManager::Get()->GetExternalSourceInfos(ExternalSourceInfos, AkEvent->GetExternalSources());
-	}
-	else if (InExternalSources.Num() >0)
-	{
-		TArray<AkUInt32> ExternalSourceCookies;
-		for ( auto ExternalSource : InExternalSources)
-		{
-			ExternalSourceCookies.Add(FAkAudioDevice::GetShortIDFromString(ExternalSource.FileName));
-		}
-		IWwiseExternalSourceManager::Get()->GetExternalSourceInfos(ExternalSourceInfos, ExternalSourceCookies);
-	}
 	AkCallbackType AkCallbackMask = AkCallbackTypeHelpers::GetCallbackMaskFromBlueprintMask(CallbackMask);
 	AkUInt32 ShortId = DeviceAndWorld.AkAudioDevice->GetShortID(AkEvent, EventName);
-	return DeviceAndWorld.AkAudioDevice->PostEventOnActor(ShortId, Actor, PostEventCallback, AkCallbackMask, bStopWhenAttachedToDestroyed, ExternalSourceInfos);
+	return DeviceAndWorld.AkAudioDevice->PostEventOnActor(ShortId, Actor, PostEventCallback, AkCallbackMask, bStopWhenAttachedToDestroyed, {});
 }
 
-int32 UAkGameplayStatics::PostAndWaitForEndOfEvent(class UAkAudioEvent* AkEvent,
-	class AActor* Actor,
-	bool bStopWhenAttachedToDestroyed,
-	FString EventName,
+int32 UAkGameplayStatics::PostAndWaitForEndOfEvent(UAkAudioEvent* AkEvent, AActor* Actor, bool bStopWhenAttachedToDestroyed,
 	FLatentActionInfo LatentInfo)
 {
-	if (AkEvent == NULL && EventName.IsEmpty())
+	if (UNLIKELY(!IsValid(AkEvent)))
 	{
-		UE_LOG(LogAkAudio, Warning, TEXT("UAkGameplayStatics::PostAkAudioEvent: No Event specified!"));
+		UE_LOG(LogAkAudio, Error, TEXT("Failed to post and wait invalid AkAudioEvent on actor '%s'."), IsValid(Actor) ? *Actor->GetName() : TEXT("(invalid)"));
 		return AK_INVALID_PLAYING_ID;
 	}
 
-	if (Actor == NULL)
-	{
-		UE_LOG(LogAkAudio, Warning, TEXT("UAkGameplayStatics::PostAkAudioEvent: NULL Actor specified!"));
-		return AK_INVALID_PLAYING_ID;
-	}
-
-	AkDeviceAndWorld DeviceAndWorld(Actor);
-	if (UNLIKELY(!DeviceAndWorld.IsValid()))
-	{
-		return AK_INVALID_PLAYING_ID;
-	}
-
-	FLatentActionManager& LatentActionManager = DeviceAndWorld.CurrentWorld->GetLatentActionManager();
-	FWaitEndOfEventAction* NewAction = new FWaitEndOfEventAction(LatentInfo);
-	LatentActionManager.AddNewAction(LatentInfo.CallbackTarget, LatentInfo.UUID, NewAction);
-	TArray<AkExternalSourceInfo> ExternalSources;
-	if (AkEvent)
-	{
-		IWwiseExternalSourceManager::Get()->GetExternalSourceInfos(ExternalSources, AkEvent->GetExternalSources());
-	}
-	AkUInt32 ShortId = DeviceAndWorld.AkAudioDevice->GetShortID(AkEvent, EventName);
-	AkUInt32 PlayingID = DeviceAndWorld.AkAudioDevice->PostEventOnActorWithLatentAction(ShortId, Actor, bStopWhenAttachedToDestroyed, NewAction, ExternalSources);
-
-	if (PlayingID == AK_INVALID_PLAYING_ID)
-	{
-		NewAction->EventFinished = true;
-	}
-	return PlayingID;
+	return AkEvent->PostOnActorAndWait(Actor, bStopWhenAttachedToDestroyed, LatentInfo);
 }
 
 void UAkGameplayStatics::PostAndWaitForEndOfEventAsync(
@@ -252,30 +164,37 @@ void UAkGameplayStatics::PostAndWaitForEndOfEventAsync(
 
 void UAkGameplayStatics::PostEventByName(const FString& EventName, class AActor* Actor, bool bStopWhenAttachedToDestroyed)
 {
-	PostEvent(NULL, Actor, 0, FOnAkPostEventCallback(), TArray<FAkExternalSourceInfo>(), bStopWhenAttachedToDestroyed, EventName);
+	AkDeviceAndWorld DeviceAndWorld(Actor);
+	if (UNLIKELY(!DeviceAndWorld.IsValid()))
+	{
+		return;
+	}
+	AkUInt32 ShortId = DeviceAndWorld.AkAudioDevice->GetShortID(nullptr, EventName);
+	DeviceAndWorld.AkAudioDevice->PostEventOnActor(ShortId, Actor, 0, {}, {}, bStopWhenAttachedToDestroyed);
 }
 
 int32 UAkGameplayStatics::PostEventAtLocation(class UAkAudioEvent* AkEvent, FVector Location, FRotator Orientation, const FString& EventName, UObject* WorldContextObject)
 {
-	if ( AkEvent == NULL && EventName.IsEmpty() )
+	if (LIKELY(IsValid(AkEvent)))
 	{
-		UE_LOG(LogAkAudio, Warning, TEXT("UAkGameplayStatics::PostEventAtLocation: No Event specified!"));
-		return AK_INVALID_PLAYING_ID;
+		return AkEvent->PostAtLocation(Location, Orientation, {}, 0, WorldContextObject);
 	}
-
 	AkDeviceAndWorld DeviceAndWorld(WorldContextObject);
 	if (UNLIKELY(!DeviceAndWorld.IsValid()))
-	{
 		return AK_INVALID_PLAYING_ID;
-	}
 
-	AkUInt32 ShortId = DeviceAndWorld.AkAudioDevice->GetShortID(AkEvent, EventName);
+	AkUInt32 ShortId = DeviceAndWorld.AkAudioDevice->GetShortID(nullptr, EventName);
 	return DeviceAndWorld.AkAudioDevice->PostEventAtLocation(EventName, ShortId, Location, Orientation, DeviceAndWorld.CurrentWorld);
 }
 
 void UAkGameplayStatics::PostEventAtLocationByName(const FString& EventName, FVector Location, FRotator Orientation, UObject* WorldContextObject)
 {
-	PostEventAtLocation(NULL, Location, Orientation, EventName, WorldContextObject);
+	AkDeviceAndWorld DeviceAndWorld(WorldContextObject);
+	if (UNLIKELY(!DeviceAndWorld.IsValid()))
+		return;
+
+	AkUInt32 ShortId = DeviceAndWorld.AkAudioDevice->GetShortID(nullptr, EventName);
+	DeviceAndWorld.AkAudioDevice->PostEventAtLocation(EventName, ShortId, Location, Orientation, DeviceAndWorld.CurrentWorld);
 }
 
 UAkComponent* UAkGameplayStatics::SpawnAkComponentAtLocation(UObject* WorldContextObject, class UAkAudioEvent* AkEvent, FVector Location, FRotator Orientation, bool AutoPost, const FString& EventName, bool AutoDestroy /* = true*/)
@@ -290,25 +209,13 @@ UAkComponent* UAkGameplayStatics::SpawnAkComponentAtLocation(UObject* WorldConte
 
 void UAkGameplayStatics::ExecuteActionOnEvent(class UAkAudioEvent* AkEvent, AkActionOnEventType ActionType, class AActor* Actor, int32 TransitionDuration, EAkCurveInterpolation FadeCurve, int32 PlayingID)
 {
-	if (AkEvent == NULL)
+	if (!AkEvent)
 	{
 		UE_LOG(LogAkAudio, Warning, TEXT("UAkGameplayStatics::ExecuteActionOnEvent: No Event specified!"));
 		return;
 	}
 
-	if (Actor == NULL)
-	{
-		UE_LOG(LogAkAudio, Warning, TEXT("UAkGameplayStatics::ExecuteActionOnEvent: NULL Actor specified!"));
-		return;
-	}
-
-	FAkAudioDevice * AudioDevice = FAkAudioDevice::Get();
-	if (UNLIKELY(!AudioDevice))
-	{
-		return;
-	}
-
-	AudioDevice->ExecuteActionOnEvent(AkEvent->GetShortID(), ActionType, Actor, TransitionDuration, FadeCurve, PlayingID);
+	AkEvent->ExecuteAction(ActionType, Actor, PlayingID, TransitionDuration, FadeCurve);
 	
 }
 
@@ -677,7 +584,7 @@ void UAkGameplayStatics::ReplaceMainOutput(const FAkOutputSettings& MainOutputSe
 		UE_LOG(LogAkAudio, Warning, TEXT("UAkGameplayStatics::ReplaceMainOutput: Could not fetch audio device, main output will not be replaced."));
 		return;
 	}
-	AkUInt32 ShortID = AudioDevice->GetShortIDFromString(MainOutputSettings.AudioDeviceSharesetName);
+	AkUInt32 ShortID = AudioDevice->GetShortIDFromString(MainOutputSettings.AudioDeviceShareSetName);
 	if (UNLIKELY(ShortID == AK_INVALID_UNIQUE_ID))
 	{
 		UE_LOG(LogAkAudio, Warning, TEXT("UAkGameplayStatics::ReplaceMainOutput: Short ID for %s is invalid, main output will not be replaced."));
@@ -692,26 +599,26 @@ void UAkGameplayStatics::ReplaceMainOutput(const FAkOutputSettings& MainOutputSe
 	AudioDevice->ReplaceMainOutput(OutSettings);
 }
 
-void UAkGameplayStatics::GetSpeakerAngles(TArray<float>& SpeakerAngles, float& HeightAngle, const FString& DeviceShareset)
+void UAkGameplayStatics::GetSpeakerAngles(TArray<float>& SpeakerAngles, float& HeightAngle, const FString& DeviceShareSet)
 {
 	FAkAudioDevice * AudioDevice = FAkAudioDevice::Get();
 	if (UNLIKELY(!AudioDevice))
 	{
 		return;
 	}
-	AkOutputDeviceID DeviceID = DeviceShareset.IsEmpty() ? 0 : AudioDevice->GetOutputID(DeviceShareset);
+	AkOutputDeviceID DeviceID = DeviceShareSet.IsEmpty() ? 0 : AudioDevice->GetOutputID(DeviceShareSet);
 	AudioDevice->GetSpeakerAngles(SpeakerAngles, HeightAngle, DeviceID);
 
 }
 
-void UAkGameplayStatics::SetSpeakerAngles(const TArray<float>& SpeakerAngles, float HeightAngles, const FString& DeviceShareset)
+void UAkGameplayStatics::SetSpeakerAngles(const TArray<float>& SpeakerAngles, float HeightAngles, const FString& DeviceShareSet)
 {
 	FAkAudioDevice* AudioDevice = FAkAudioDevice::Get();
 	if (UNLIKELY(!AudioDevice))
 	{
 		return;
 	}
-	AkOutputDeviceID DeviceID = DeviceShareset.IsEmpty() ? 0 : AudioDevice->GetOutputID(DeviceShareset);
+	AkOutputDeviceID DeviceID = DeviceShareSet.IsEmpty() ? 0 : AudioDevice->GetOutputID(DeviceShareSet);
 	AudioDevice->SetSpeakerAngles(SpeakerAngles, HeightAngles, DeviceID);
 
 }
@@ -823,14 +730,43 @@ void UAkGameplayStatics::StopAllAmbientSounds(UObject* WorldContextObject)
 	}
 }
 
-void UAkGameplayStatics::ClearBanks()
+void UAkGameplayStatics::ClearSoundBanksAndMedia()
 {
 	FAkAudioDevice * AudioDevice = FAkAudioDevice::Get();
 	if (UNLIKELY(!AudioDevice))
 	{
 		return;
 	}
-	AudioDevice->ClearBanks();
+	AudioDevice->ClearSoundBanksAndMedia();
+}
+
+void UAkGameplayStatics::ClearBanks()
+{
+	ClearSoundBanksAndMedia();
+}
+
+void UAkGameplayStatics::LoadInitBank()
+{
+	auto* InitBankLoader = FWwiseInitBankLoader::Get();
+	if(UNLIKELY(!InitBankLoader))
+	{
+		UE_LOG(LogAkAudio, Error, TEXT("LoadInitBank: WwiseInitBankLoader is not initialized."));
+		return;
+	}
+
+	InitBankLoader->LoadInitBank();
+}
+
+void UAkGameplayStatics::UnloadInitBank()
+{
+	auto* InitBankLoader = FWwiseInitBankLoader::Get();
+	if(UNLIKELY(!InitBankLoader))
+	{
+		UE_LOG(LogAkAudio, Error, TEXT("UnloadInitBank: WwiseInitBankLoader is not initialized."));
+		return;
+	}
+
+	InitBankLoader->UnloadInitBank();
 }
 
 void UAkGameplayStatics::LoadBankByName(const FString& BankName)
@@ -981,7 +917,7 @@ void UAkGameplayStatics::SetDistanceProbe(AActor* Listener, AActor* DistanceProb
 {
 	if (Listener == nullptr)
 	{
-		UE_LOG(LogScript, Warning, TEXT("UAkGameplayStatics::SetDistanceProbe: NULL Listener specified!"));
+		UE_LOG(LogAkAudio, Warning, TEXT("UAkGameplayStatics::SetDistanceProbe: NULL Listener specified!"));
 		return;
 	}
 
@@ -1000,45 +936,88 @@ void UAkGameplayStatics::SetDistanceProbe(AActor* Listener, AActor* DistanceProb
 
 bool UAkGameplayStatics::SetOutputDeviceEffect(const FAkOutputDeviceID InDeviceID, const int32 InEffectIndex, const UAkEffectShareSet* InEffectShareSet)
 {
-	auto* SoundEngine = FWwiseLowLevelSoundEngine::Get();
+	if(UNLIKELY(!InEffectShareSet)) 
+	{
+		UE_LOG(LogAkAudio, Warning, TEXT("UAkGameplayStatics::SetOutputDeviceEffect: NULL Effect ShareSet specified!"));
+		return false;
+	}
+
+	auto* SoundEngine = IWwiseSoundEngineAPI::Get();
 	if (UNLIKELY(!SoundEngine)) return false;
 
-	AKRESULT Result =  SoundEngine->SetOutputDeviceEffect(InDeviceID.UInt64Value, InEffectIndex, InEffectShareSet->SharesetCookedData.SharesetId);
+	UE_LOG(LogAkAudio, Verbose, TEXT("UAkGameplayStatics::SetOutputDeviceEffect: DeviceID: %" PRIu64 ", InEffectIndex: %d, EffectShareSet Asset Name: %s, EffectShareSet ShortID: %" PRIu32 "."), 
+		InDeviceID.UInt64Value, InEffectIndex, *InEffectShareSet->GetName(), InEffectShareSet->GetShortID());
+
+	AKRESULT Result =  SoundEngine->SetOutputDeviceEffect(InDeviceID.UInt64Value, InEffectIndex, InEffectShareSet->GetShortID());
 	return Result == AK_Success;
 }
 
 bool UAkGameplayStatics::SetBusEffectByName(const FString InBusName, const int32 InEffectIndex, const UAkEffectShareSet* InEffectShareSet)
 {
-	auto* SoundEngine = FWwiseLowLevelSoundEngine::Get();
+	if(UNLIKELY(!InEffectShareSet)) 
+	{
+		UE_LOG(LogAkAudio, Warning, TEXT("UAkGameplayStatics::SetBusEffectByName: NULL Effect ShareSet specified!"));
+		return false;
+	}
+	auto* SoundEngine = IWwiseSoundEngineAPI::Get();
 	if (UNLIKELY(!SoundEngine)) return false;
 
-	AKRESULT Result = SoundEngine->SetBusEffect(TCHAR_TO_AK(*InBusName), InEffectIndex, InEffectShareSet->SharesetCookedData.SharesetId);
+	UE_LOG(LogAkAudio, Verbose, TEXT("UAkGameplayStatics::SetBusEffectByName: BusName: %s, InEffectIndex: %d,  EffectShareSet Asset Name: %s, EffectShareSet ShortID: %" PRIu32 "."), 
+		*InBusName, InEffectIndex, *InEffectShareSet->GetName(), InEffectShareSet->GetShortID());
+
+	AKRESULT Result = SoundEngine->SetBusEffect(TCHAR_TO_AK(*InBusName), InEffectIndex, InEffectShareSet->GetShortID());
 	return Result == AK_Success;
 }
 
 bool UAkGameplayStatics::SetBusEffectByID(const FAkUniqueID InBusID, const int32 InEffectIndex, const UAkEffectShareSet* InEffectShareSet)
 {
-	auto* SoundEngine = FWwiseLowLevelSoundEngine::Get();
+	if(UNLIKELY(!InEffectShareSet)) 
+	{
+		UE_LOG(LogAkAudio, Warning, TEXT("UAkGameplayStatics::SetBusEffectByID: NULL Effect ShareSet specified!"));
+		return false;
+	}
+	auto* SoundEngine = IWwiseSoundEngineAPI::Get();
 	if (UNLIKELY(!SoundEngine)) return false;
 
-	AKRESULT Result = SoundEngine->SetBusEffect(InBusID.UInt32Value, InEffectIndex, InEffectShareSet->SharesetCookedData.SharesetId);
+	UE_LOG(LogAkAudio, Verbose, TEXT("UAkGameplayStatics::SetBusEffectByID: BusID: %" PRIu32 ", InEffectIndex: %d, EffectShareSet Asset Name: %s, EffectShareSet ShortID: %" PRIu32 "."), 
+		InBusID.UInt32Value, InEffectIndex, *InEffectShareSet->GetName(), InEffectShareSet->GetShortID());
+	AKRESULT Result = SoundEngine->SetBusEffect(InBusID.UInt32Value, InEffectIndex, InEffectShareSet->GetShortID());
 	return Result == AK_Success;
 }
 
 bool UAkGameplayStatics::SetAuxBusEffect(const UAkAuxBus* InAuxBus, const int32 InEffectIndex, const UAkEffectShareSet* InEffectShareSet)
 {
-	auto* SoundEngine = FWwiseLowLevelSoundEngine::Get();
+	if(UNLIKELY(!InEffectShareSet)) 
+	{
+		UE_LOG(LogAkAudio, Warning, TEXT("UAkGameplayStatics::SetAuxBusEffect: NULL Effect ShareSet specified!"));
+		return false;
+	}
+	if(UNLIKELY(!InAuxBus)) 
+	{
+		UE_LOG(LogAkAudio, Warning, TEXT("UAkGameplayStatics::SetAuxBusEffect: NULL Aux Bus specified!"));
+		return false;
+	}
+	auto* SoundEngine = IWwiseSoundEngineAPI::Get();
 	if (UNLIKELY(!SoundEngine)) return false;
 
-	AKRESULT Result = SoundEngine->SetBusEffect(InAuxBus->AuxBusCookedData.AuxBusId, InEffectIndex, InEffectShareSet->SharesetCookedData.SharesetId);
+	UE_LOG(LogAkAudio, Verbose, TEXT("UAkGameplayStatics::SetAuxBusEffect: AuxBus Asset Name: %s, AuxBus Short ID: %" PRIu32 ", InEffectIndex: %d, EffectShareSet Asset Name: %s, EffectShareSet ShortID: %" PRIu32 "."), 
+		*InAuxBus->GetName(), InAuxBus->GetShortID(), InEffectIndex, *InEffectShareSet->GetName(), InEffectShareSet->GetShortID());
+	AKRESULT Result = SoundEngine->SetBusEffect(InAuxBus->GetShortID(), InEffectIndex, InEffectShareSet->GetShortID());
 	return Result == AK_Success;
 }
 
 bool UAkGameplayStatics::SetActorMixerEffect(const FAkUniqueID InAudioNodeID,const  int32 InEffectIndex, const UAkEffectShareSet* InEffectShareSet)
 {
-	auto* SoundEngine = FWwiseLowLevelSoundEngine::Get();
+	if(UNLIKELY(!InEffectShareSet)) 
+	{
+		UE_LOG(LogAkAudio, Warning, TEXT("UAkGameplayStatics::SetActorMixerEffect: NULL Effect ShareSet specified!"));
+		return false;
+	}
+	auto* SoundEngine = IWwiseSoundEngineAPI::Get();
 	if (UNLIKELY(!SoundEngine)) return false;
 
-	AKRESULT Result = SoundEngine->SetActorMixerEffect(InAudioNodeID.UInt32Value, InEffectIndex, InEffectShareSet->SharesetCookedData.SharesetId);
+	UE_LOG(LogAkAudio, Verbose, TEXT("UAkGameplayStatics::SetActorMixerEffect: AudioNodeID: %" PRIu32 ", InEffectIndex: %d, EffectShareSet Asset Name: %s, EffectShareSet ShortID: %" PRIu32 "."), 
+		InAudioNodeID.UInt32Value, InEffectIndex, *InEffectShareSet->GetName(), InEffectShareSet->GetShortID());
+	AKRESULT Result = SoundEngine->SetActorMixerEffect(InAudioNodeID.UInt32Value, InEffectIndex, InEffectShareSet->GetShortID());
 	return Result == AK_Success;
 }

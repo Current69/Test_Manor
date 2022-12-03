@@ -1,16 +1,18 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
-Copyright (c) 2021 Audiokinetic Inc.
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
+Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
 #pragma once
@@ -40,15 +42,15 @@ public:
 	 * If this Late Reverb is applied to a Spatial Audio room, it will be active even if the maximum number of simultaneous reverb volumes (see integration settings) was reached.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Toggle, meta = (DisplayName = "Enable Late Reverb"))
-	uint32 bEnable:1;
+	bool bEnable = false;
 
 	/** Maximum send level to the Wwise Auxiliary Bus associated to this AkReverbVolume */
 	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Late Reverb", meta = (ClampMin = 0.0f, ClampMax = 1.0f, UIMin = 0.0f, UIMax = 1.0f))
-	float SendLevel;
+	float SendLevel = .0f;
 
 	/** Rate at which to fade in/out the SendLevel of the current Reverb Volume when entering/exiting it, in percentage per second (0.2 will make the fade time 5 seconds) */
 	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Late Reverb" ,meta = (ClampMin = 0.0f, UIMin = 0.0f))
-	float FadeRate;
+	float FadeRate = .0f;
 
 	/**
 	 * The precedence in which the AkReverbVolumes will be applied. In the case of overlapping volumes, only the ones 
@@ -58,7 +60,7 @@ public:
 	 * Sound emitted by game objects in a room will always be sent to the room late reverb independently of other late reverbs in the scene.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Late Reverb")
-	float Priority;
+	float Priority = .0f;
 
 	/**
 	 * When enabled, the aux bus for this reverb component will be assigned automatically. This is done by estimating the decay time of the reverb produced by the parent Primitive Component, given its volume and surface area.
@@ -68,7 +70,7 @@ public:
 	bool AutoAssignAuxBus = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "!AutoAssignAuxBus"), Category = "Late Reverb")
-	class UAkAuxBus* AuxBus;
+	class UAkAuxBus* AuxBus = nullptr;
 
 	/** Wwise Auxiliary Bus associated to this AkReverbVolume */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, meta = (EditCondition = "!AutoAssignAuxBus"), Category = "Late Reverb")
@@ -129,7 +131,7 @@ private:
 	
 	/** Save the manually assigned aux bus so we can recall it if auto-assign is disabled. */
 	UPROPERTY()
-	class UAkAuxBus* AuxBusManual;
+	class UAkAuxBus* AuxBusManual = nullptr;
 
 	/** The component that will be used to estimate the HFDamping value. This will usually be an AkGeometryComponent.
 	 *  When the owning Actor is a Volume (as is the case for SpatialAudioVolume) this will be an AkSurfaceReflectorSetComponent.

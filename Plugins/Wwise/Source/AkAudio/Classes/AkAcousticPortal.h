@@ -1,23 +1,25 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
-Copyright (c) 2021 Audiokinetic Inc.
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
+Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
 #pragma once
 
 #include "Components/TextRenderComponent.h"
 #include "GameFramework/Volume.h"
-#include "OcclusionObstructionService/AkPortalOcclusionObstructionService.h"
+#include "ObstructionAndOcclusionService/AkPortalObstructionAndOcclusionService.h"
 #include "AkGameplayTypes.h"
 #if WITH_EDITOR
 #include "AkSettings.h"
@@ -59,7 +61,7 @@ public:
 
 	/** Time interval between obstruction checks (direct line of sight between listener and portal opening). Set to 0 to disable obstruction checks. We recommend disabling it if you want to use full Spatial Audio diffraction. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AkPortalComponent|Obstruction")
-	float ObstructionRefreshInterval;
+	float ObstructionRefreshInterval = .0f;
 
 	/** Collision channel for obstruction checks (between listener and portal opening). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AkPortalComponent|Obstruction")
@@ -127,7 +129,7 @@ private:
 	UAkRoomComponent* FrontRoom;
 	UAkRoomComponent* BackRoom;
 
-	AkPortalOcclusionObstructionService ObstructionService;
+	AkPortalObstructionAndOcclusionService ObstructionService;
 
 #if WITH_EDITOR
 	void HandleObjectsReplaced(const TMap<UObject*, UObject*>& ReplacementMap);
@@ -177,7 +179,7 @@ public:
 	AkRoomID GetBackRoom() const;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Portal", meta = (ShowOnlyInnerProperties))
-	UAkPortalComponent* Portal;
+	UAkPortalComponent* Portal = nullptr;
 
 	virtual void PostRegisterAllComponents() override;
 	virtual void PostLoad() override;
@@ -231,7 +233,7 @@ protected:
 	Sets the collision channel for the ray traces performed to fit the portal to the surrounding geometry. When set to 'Use Integration Settings Default', the value will be taken from the DefaultFitToGeometryCollisionChannel in the Wwise Integration Settings.
 	*/
 	UPROPERTY(EditAnywhere, Category = "Fit to Geometry")
-	TEnumAsByte<EAkCollisionChannel> CollisionChannel;
+	TEnumAsByte<EAkCollisionChannel> CollisionChannel = { EAkCollisionChannel::EAKCC_UseIntegrationSettingsDefault };
 
 #if WITH_EDITOR
 	/**

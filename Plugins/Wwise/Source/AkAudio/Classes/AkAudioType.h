@@ -1,16 +1,18 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
-Copyright (c) 2021 Audiokinetic Inc.
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
+Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
 #pragma once
@@ -18,31 +20,30 @@ Copyright (c) 2021 Audiokinetic Inc.
 
 #include "AkInclude.h"
 #include "UObject/Object.h"
-#include "Wwise/Info/WwiseBasicInfo.h"
-#include "Wwise/WwiseExternalSourceManager.h"
+#include "Wwise/Info/WwiseObjectInfo.h"
 
 #include "AkAudioType.generated.h"
 
-UCLASS()
+class FWwiseProjectDatabase;
+class UWwiseProjectDatabase;
+UCLASS(Abstract)
 class AKAUDIO_API UAkAudioType : public UObject
 {
 	GENERATED_BODY()
 
 public:
 
-UPROPERTY(VisibleAnywhere, Category = "AkAudioType|Behaviour")
-bool bAutoLoad = true;
+	///< When true, SoundBanks and medias associated with this asset will be loaded in the Wwise SoundEngine when Unreal loads this asset.
+	UPROPERTY(EditAnywhere, Category = "AkAudioType|Behaviour")
+	bool bAutoLoad = true;
 
 // Deprecated ID properties used in migration
 #if WITH_EDITORONLY_DATA
-	UPROPERTY(Transient, AssetRegistrySearchable)
-	FGuid WwiseGuid;
-
 	UPROPERTY(meta=(Deprecated))
 	FGuid ID_DEPRECATED;
 
 	UPROPERTY(meta=(Deprecated))
-	uint32 ShortID_DEPRECATED;
+	uint32 ShortID_DEPRECATED = 0;
 #endif
 	
 	UPROPERTY(EditAnywhere, Category = "AkAudioType")
@@ -50,14 +51,21 @@ bool bAutoLoad = true;
 
 public:
 	void Serialize(FArchive& Ar) override;
-	virtual void LoadData()   {}
-	virtual void ReloadData() {}
-	virtual void UnloadData() {}
-	void LogSerializationState(const FArchive& Ar);
-	virtual AkUInt32 GetShortID() {return 0;}
 
 	UFUNCTION(BlueprintCallable, Category = "Audiokinetic|AkAudioType")
-	int32 GetWwiseShortID() {return GetShortID();}
+	virtual void LoadData()   {}
+
+	UFUNCTION(BlueprintCallable, Category = "Audiokinetic|AkAudioType")
+	virtual void UnloadData() {}
+
+	void LogSerializationState(const FArchive& Ar);
+	virtual AkUInt32 GetShortID() const;
+
+	bool IsPostLoadThreadSafe() const override { return true; }
+	bool IsDestructionThreadSafe() const override { return true; }
+
+	UFUNCTION(BlueprintCallable, Category = "Audiokinetic|AkAudioType")
+	int32 GetWwiseShortID() const { return GetShortID();}
 
 	template<typename T>
 	T* GetUserData()
@@ -74,8 +82,15 @@ public:
 	}
 	
 #if WITH_EDITORONLY_DATA
-	virtual FWwiseBasicInfo* GetInfoMutable();
+	virtual FWwiseObjectInfo* GetInfoMutable();
+	virtual FWwiseObjectInfo GetInfo() const {return {};}
+	virtual FGuid GetWwiseGuid() const {return GetInfo().WwiseGuid;}
+	virtual FName GetWwiseName() const {return GetInfo().WwiseName;}
 	virtual void BeginCacheForCookedPlatformData(const ITargetPlatform* TargetPlatform) override;
+	virtual void FillInfo() {}
+	virtual void FillMetadata(FWwiseProjectDatabase* ProjectDatabase) {}
+	virtual void CheckWwiseObjectInfo();
+	virtual void MigrateWwiseObjectInfo();
 
 	template <class InfoType>
 	InfoType GetValidatedInfo(const InfoType& InInfo)
@@ -84,11 +99,12 @@ public:
 		ValidateShortID(TempInfo);
 		return TempInfo;
 	}
+	virtual void ValidateShortID(FWwiseObjectInfo& WwiseInfo) const;
 #endif
 
-protected:
-#if WITH_EDITORONLY_DATA
-	virtual void MigrateIds();
-	void ValidateShortID(FWwiseBasicInfo& WwiseInfo) const;
+#if WITH_EDITOR
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+	virtual void GetAssetRegistryTags(TArray<FAssetRegistryTag>& OutTags) const override;
 #endif
+
 };

@@ -1,15 +1,17 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
 Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
@@ -19,8 +21,8 @@ Copyright (c) 2022 Audiokinetic Inc.
 #include "Modules/ModuleManager.h"
 #include "Misc/ConfigCacheIni.h"
 
-class UWwiseResourceLoaderImpl;
-class UWwiseResourceLoader;
+class FWwiseResourceLoaderImpl;
+class FWwiseResourceLoader;
 
 class IWwiseResourceLoaderModule : public IModuleInterface
 {
@@ -48,7 +50,9 @@ public:
 		{
 			return nullptr;
 		}
-
+#if UE_SERVER
+		return nullptr;
+#else
 		FModuleManager& ModuleManager = FModuleManager::Get();
 		IWwiseResourceLoaderModule* Result = ModuleManager.GetModulePtr<IWwiseResourceLoaderModule>(ModuleName);
 		if (UNLIKELY(!Result))
@@ -73,10 +77,12 @@ public:
 		}
 
 		return Result;
+#endif
 	}
 
-	virtual UWwiseResourceLoader* GetResourceLoader() { return nullptr; }
-	virtual UWwiseResourceLoaderImpl* InstantiateResourceLoaderImpl() { return nullptr; }
+	virtual FWwiseResourceLoader* GetResourceLoader() { return nullptr; }
+	virtual FWwiseResourceLoaderImpl* InstantiateResourceLoaderImpl() { return nullptr; }
+	virtual FWwiseResourceLoader* InstantiateResourceLoader() { return nullptr; }
 
 private:
 	static inline FName GetModuleNameFromConfig()
@@ -85,11 +91,4 @@ private:
 		GConfig->GetString(TEXT("Audio"), TEXT("WwiseResourceLoaderModuleName"), ModuleName, GEngineIni);
 		return FName(ModuleName);
 	}
-};
-
-class WWISERESOURCELOADER_API FWwiseResourceLoaderModule : public IWwiseResourceLoaderModule
-{
-public:
-	UWwiseResourceLoader* GetResourceLoader() override;
-	UWwiseResourceLoaderImpl* InstantiateResourceLoaderImpl() override;
 };

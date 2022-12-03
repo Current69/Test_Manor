@@ -1,15 +1,17 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
 Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
@@ -25,7 +27,7 @@ Copyright (c) 2022 Audiokinetic Inc.
 #include "Wwise/Ref/WwiseRefExternalSource.h"
 #include "Wwise/Ref/WwiseRefGameParameter.h"
 #include "Wwise/Ref/WwiseRefMedia.h"
-#include "Wwise/Ref/WwiseRefPluginShareset.h"
+#include "Wwise/Ref/WwiseRefPluginShareSet.h"
 #include "Wwise/Ref/WwiseRefState.h"
 #include "Wwise/Ref/WwiseRefStateGroup.h"
 #include "Wwise/WwiseProjectDatabaseModule.h"
@@ -109,18 +111,18 @@ WwiseCustomPluginIdsMap FWwiseRefSoundBank::GetCustomPlugins(const WwiseCustomPl
 	return Result;
 }
 
-WwisePluginSharesetIdsMap FWwiseRefSoundBank::GetPluginSharesets(const WwisePluginSharesetGlobalIdsMap& GlobalMap) const
+WwisePluginShareSetIdsMap FWwiseRefSoundBank::GetPluginShareSets(const WwisePluginShareSetGlobalIdsMap& GlobalMap) const
 {
 	const auto* SoundBank = GetSoundBank();
 	if (!SoundBank || !SoundBank->Plugins)
 	{
 		return {};
 	}
-	const auto& PluginSharesets = SoundBank->Plugins->Sharesets;
+	const auto& PluginShareSets = SoundBank->Plugins->ShareSets;
 
-	WwisePluginSharesetIdsMap Result;
-	Result.Empty(PluginSharesets.Num());
-	for (const auto& Elem : PluginSharesets)
+	WwisePluginShareSetIdsMap Result;
+	Result.Empty(PluginShareSets.Num());
+	for (const auto& Elem : PluginShareSets)
 	{
 		FWwiseDatabaseLocalizableIdKey Id(Elem.Id, LanguageId);
 
@@ -170,7 +172,7 @@ WwiseEventIdsMap FWwiseRefSoundBank::GetEvents(const WwiseEventGlobalIdsMap& Glo
 	Result.Empty(Events.Num());
 	for (const auto& Elem : Events)
 	{
-		FWwiseDatabaseEventIdKey Id(Elem.Id, LanguageId, SoundBankId());
+		FWwiseDatabaseLocalizableIdKey Id(Elem.Id, LanguageId, SoundBankId());
 
 		const auto* InGlobalMap = GlobalMap.Find(Id);
 		if (InGlobalMap)
@@ -486,7 +488,7 @@ FGuid FWwiseRefSoundBank::SoundBankGuid() const
 	return SoundBank->GUID;
 }
 
-FString FWwiseRefSoundBank::SoundBankShortName() const
+FName FWwiseRefSoundBank::SoundBankShortName() const
 {
 	const auto* SoundBank = GetSoundBank();
 	if (UNLIKELY(!SoundBank))
@@ -496,7 +498,7 @@ FString FWwiseRefSoundBank::SoundBankShortName() const
 	return SoundBank->ShortName;
 }
 
-FString FWwiseRefSoundBank::SoundBankObjectPath() const
+FName FWwiseRefSoundBank::SoundBankObjectPath() const
 {
 	const auto* SoundBank = GetSoundBank();
 	if (UNLIKELY(!SoundBank))

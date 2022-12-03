@@ -1,27 +1,29 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.the
-
-Copyright (c) 2021 Audiokinetic Inc.
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
+Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
 #pragma once
 
 #include "AkAudioType.h"
-#include "Wwise/CookedData/WwiseLocalizedSharesetCookedData.h"
-#include "Wwise/Loaded/WwiseLoadedShareset.h"
+#include "Wwise/CookedData/WwiseLocalizedShareSetCookedData.h"
+#include "Wwise/Loaded/WwiseLoadedShareSet.h"
 #if WITH_EDITORONLY_DATA
-#include "Wwise/Info/WwiseAssetInfo.h"
+#include "Wwise/Info/WwiseObjectInfo.h"
 #endif
-#include "AkEffectShareset.generated.h"
+#include "AkEffectShareSet.generated.h"
 
 UCLASS(BlueprintType)
 class AKAUDIO_API UAkEffectShareSet : public UAkAudioType
@@ -30,36 +32,34 @@ class AKAUDIO_API UAkEffectShareSet : public UAkAudioType
 public:
 
 	UPROPERTY(Transient, VisibleAnywhere, Category = "AkEffectShareSet")
-	FWwiseLocalizedSharesetCookedData SharesetCookedData;
+	FWwiseLocalizedShareSetCookedData ShareSetCookedData;
 
 #if WITH_EDITORONLY_DATA
 	UPROPERTY(EditAnywhere, Category = "AkEffectShareSet")
-	FWwiseAssetInfo SharesetInfo;
+	FWwiseObjectInfo ShareSetInfo;
 #endif
 
 public:
 	void Serialize(FArchive& Ar) override;
-	void LoadEffectShareset(bool bReload);
-	void UnloadEffectShareset();
 	void BeginDestroy() override;
 
-	virtual void LoadData()   override {LoadEffectShareset(false);}
-	virtual void ReloadData() override {LoadEffectShareset(true); }
-	virtual void UnloadData() override {UnloadEffectShareset();}
-	virtual AkUInt32 GetShortID() override {return SharesetCookedData.SharesetId;}
-
-#if WITH_EDITOR
-	void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
-#endif
+	virtual void LoadData()   override {LoadEffectShareSet();}
+	virtual void UnloadData() override {UnloadEffectShareSet();}
+	virtual AkUInt32 GetShortID() const override {return ShareSetCookedData.ShareSetId;} 
 
 	void PostLoad() override;
 
 #if WITH_EDITORONLY_DATA
-	virtual FWwiseBasicInfo* GetInfoMutable() override {return &SharesetInfo;};
+	virtual FWwiseObjectInfo* GetInfoMutable() override {return &ShareSetInfo;};
+	virtual FWwiseObjectInfo GetInfo() const override{return ShareSetInfo;}
+
 	void CookAdditionalFilesOverride(const TCHAR* PackageFilename, const ITargetPlatform* TargetPlatform,
 		TFunctionRef<void(const TCHAR* Filename, void* Data, int64 Size)> WriteAdditionalFile) override;
+	virtual void FillInfo() override;
 #endif
 
 private :
-	FWwiseLoadedSharesetListNode* LoadedShareset;
+	void LoadEffectShareSet();
+	void UnloadEffectShareSet();
+	FWwiseLoadedShareSet LoadedShareSet;
 };

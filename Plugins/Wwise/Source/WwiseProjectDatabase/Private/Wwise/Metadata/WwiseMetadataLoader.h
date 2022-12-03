@@ -1,15 +1,17 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
 Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
@@ -37,12 +39,12 @@ struct FWwiseMetadataLoader
 	}
 
 	void Fail(const TCHAR* FieldName);
-	void LogParsed(const TCHAR* FieldName, const uint32 Id = 0, const TCHAR* Name = nullptr);
+	void LogParsed(const TCHAR* FieldName, const uint32 Id = 0, const FName Name = FName());
 
 	bool GetBool(FWwiseMetadataLoadable* Object, const FString& FieldName, EWwiseRequiredMetadata Required = EWwiseRequiredMetadata::Mandatory);
 	float GetFloat(FWwiseMetadataLoadable* Object, const FString& FieldName, EWwiseRequiredMetadata Required = EWwiseRequiredMetadata::Mandatory);
 	FGuid GetGuid(FWwiseMetadataLoadable* Object, const FString& FieldName, EWwiseRequiredMetadata Required = EWwiseRequiredMetadata::Mandatory);
-	FString GetString(FWwiseMetadataLoadable* Object, const FString& FieldName, EWwiseRequiredMetadata Required = EWwiseRequiredMetadata::Mandatory);
+	FName GetString(FWwiseMetadataLoadable* Object, const FString& FieldName, EWwiseRequiredMetadata Required = EWwiseRequiredMetadata::Mandatory);
 	uint32 GetUint32(FWwiseMetadataLoadable* Object, const FString& FieldName, EWwiseRequiredMetadata Required = EWwiseRequiredMetadata::Mandatory);
 
 	template <typename T>
@@ -55,7 +57,7 @@ struct FWwiseMetadataLoader
 	TArray<T> GetArray(FWwiseMetadataLoadable* Object, const FString& FieldName);
 
 	template<typename T>
-	void GetPropertyArray(T* Object, const TMap<FString, size_t>& FloatProperties);
+	void GetPropertyArray(T* Object, const TMap<FName, size_t>& FloatProperties);
 };
 
 template<typename T>
@@ -170,7 +172,7 @@ TArray<T> FWwiseMetadataLoader::GetArray(FWwiseMetadataLoadable* Object, const F
 }
 
 template <typename T>
-void FWwiseMetadataLoader::GetPropertyArray(T* Object, const TMap<FString, size_t>& FloatProperties)
+void FWwiseMetadataLoader::GetPropertyArray(T* Object, const TMap<FName, size_t>& FloatProperties)
 {
 	check(Object);
 	Object->AddRequestedValue(TEXT("propertyarray"), TEXT("Properties"));
@@ -192,7 +194,7 @@ void FWwiseMetadataLoader::GetPropertyArray(T* Object, const TMap<FString, size_
 			continue;
 		}
 
-		auto SharedRef(InnerJsonObjectPtr->ToSharedRef());
+		const auto SharedRef(InnerJsonObjectPtr->ToSharedRef());
 		FString Name;
 		if (!SharedRef->TryGetStringField(TEXT("Name"), Name))
 		{
@@ -211,7 +213,7 @@ void FWwiseMetadataLoader::GetPropertyArray(T* Object, const TMap<FString, size_
 			Fail(TEXT("Property::Value"));
 			continue;
 		}
-		if (const auto* Property = FloatProperties.Find(Name))
+		if (const auto* Property = FloatProperties.Find(FName(Name)))
 		{
 			*(float*)((intptr_t)Object + *Property) = Value;
 		}

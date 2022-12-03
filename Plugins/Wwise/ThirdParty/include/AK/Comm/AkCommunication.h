@@ -39,6 +39,7 @@ the specific language governing permissions and limitations under the License.
 #include <AK/Tools/Common/AkPlatformFuncs.h>
 
 #define AK_COMM_SETTINGS_MAX_STRING_SIZE 64
+#define AK_COMM_SETTINGS_MAX_URL_SIZE 128
 
 /// Platform-independent initialization settings of communication module between the Wwise sound engine
 /// and authoring tool.
@@ -50,6 +51,7 @@ struct AkCommSettings
 		: commSystem(AkCommSystem_Socket)
 	{
 		szAppNetworkName[0] = 0;
+		szCommProxyServerUrl[0] = 0;
 	}
 
 	/// Ports used for communication between the Wwise authoring application and your game.
@@ -116,6 +118,9 @@ struct AkCommSettings
 	/// Optional name that will be displayed over network remote connection of Wwise.
 	/// It must be a NULL terminated string.
 	char szAppNetworkName[AK_COMM_SETTINGS_MAX_STRING_SIZE];
+
+	/// Optional URL of Comm proxy server (only applicable for platforms incapable of acting as raw UDP/TCP servers)
+	char szCommProxyServerUrl[AK_COMM_SETTINGS_MAX_URL_SIZE];
 };
 
 namespace AK

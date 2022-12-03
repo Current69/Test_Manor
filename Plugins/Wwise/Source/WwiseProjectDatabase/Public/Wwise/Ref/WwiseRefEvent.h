@@ -1,15 +1,17 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
 Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
@@ -28,7 +30,7 @@ public:
 	WwiseRefIndexType EventIndex;
 
 	FWwiseRefEvent() {}
-	FWwiseRefEvent(const WwiseMetadataSharedRootFileConstPtr& InRootMediaRef, const FString& InJsonFilePath,
+	FWwiseRefEvent(const WwiseMetadataSharedRootFileConstPtr& InRootMediaRef, const FName& InJsonFilePath,
 		WwiseRefIndexType InSoundBankIndex, uint32 InLanguageId,
 		WwiseRefIndexType InEventIndex) :
 		FWwiseRefSoundBank(InRootMediaRef, InJsonFilePath, InSoundBankIndex, InLanguageId),
@@ -41,8 +43,8 @@ public:
 	WwiseExternalSourceIdsMap GetAllExternalSources(const WwiseExternalSourceGlobalIdsMap& GlobalMap) const;
 	WwiseCustomPluginIdsMap GetCustomPlugins(const WwiseCustomPluginGlobalIdsMap& GlobalMap) const;
 	WwiseCustomPluginIdsMap GetAllCustomPlugins(const WwiseCustomPluginGlobalIdsMap& GlobalMap) const;
-	WwisePluginSharesetIdsMap GetPluginSharesets(const WwisePluginSharesetGlobalIdsMap& GlobalMap) const;
-	WwisePluginSharesetIdsMap GetAllPluginSharesets(const WwisePluginSharesetGlobalIdsMap& GlobalMap) const;
+	WwisePluginShareSetIdsMap GetPluginShareSets(const WwisePluginShareSetGlobalIdsMap& GlobalMap) const;
+	WwisePluginShareSetIdsMap GetAllPluginShareSets(const WwisePluginShareSetGlobalIdsMap& GlobalMap) const;
 	WwiseAudioDeviceIdsMap GetAudioDevices(const WwiseAudioDeviceGlobalIdsMap& GlobalMap) const;
 	WwiseAudioDeviceIdsMap GetAllAudioDevices(const WwiseAudioDeviceGlobalIdsMap& GlobalMap) const;
 	WwiseSwitchContainerArray GetSwitchContainers(const WwiseSwitchContainersByEvent& GlobalMap) const;
@@ -54,8 +56,8 @@ public:
 
 	uint32 EventId() const;
 	FGuid EventGuid() const;
-	FString EventName() const;
-	FString EventObjectPath() const;
+	FName EventName() const;
+	FName EventObjectPath() const;
 	uint32 MaxAttenuation() const;
 	bool GetDuration(EWwiseMetadataEventDurationType& OutDurationType, float& OutDurationMin, float& OutDurationMax) const;
 

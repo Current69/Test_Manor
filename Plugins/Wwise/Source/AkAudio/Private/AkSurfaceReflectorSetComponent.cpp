@@ -1,16 +1,18 @@
 /*******************************************************************************
-The content of the files in this repository include portions of the
-AUDIOKINETIC Wwise Technology released in source code form as part of the SDK
-package.
-
-Commercial License Usage
-
-Licensees holding valid commercial licenses to the AUDIOKINETIC Wwise Technology
-may use these files in accordance with the end user license agreement provided
-with the software or, alternatively, in accordance with the terms contained in a
-written agreement between you and Audiokinetic Inc.
-
-Copyright (c) 2021 Audiokinetic Inc.
+The content of this file includes portions of the proprietary AUDIOKINETIC Wwise
+Technology released in source code form as part of the game integration package.
+The content of this file may not be used without valid licenses to the
+AUDIOKINETIC Wwise Technology.
+Note that the use of the game engine is subject to the Unreal(R) Engine End User
+License Agreement at https://www.unrealengine.com/en-US/eula/unreal
+ 
+License Usage
+ 
+Licensees holding valid licenses to the AUDIOKINETIC Wwise Technology may use
+this file in accordance with the end user license agreement provided with the
+software or, alternatively, in accordance with the terms contained
+in a written agreement between you and Audiokinetic Inc.
+Copyright (c) 2022 Audiokinetic Inc.
 *******************************************************************************/
 
 #include "AkSurfaceReflectorSetComponent.h"
@@ -339,14 +341,6 @@ void UAkSurfaceReflectorSetComponent::CacheAcousticProperties()
 void UAkSurfaceReflectorSetComponent::CacheLocalSpaceSurfaceGeometry()
 {
 	PreviousPolys = AcousticPolys;
-}
-
-void UAkSurfaceReflectorSetComponent::SkipNextTexturesUpdate()
-{
-	if (GetWorld() && GetWorld()->ShouldTick())
-	{
-		bSkipTexturesUpdate = true;
-	}
 }
 
 bool UAkSurfaceReflectorSetComponent::TexturesDiffer() const
@@ -971,9 +965,8 @@ void UAkSurfaceReflectorSetComponent::TickComponent(float DeltaTime, enum ELevel
 	const bool bNumBrushNodesChanged = (ParentBrush && ParentBrush->Nodes.Num() != AcousticPolys.Num());
 	if (PolysNeedUpdate || bNumBrushNodesChanged)
 	{
-		const bool bPreserveTextures = bSkipTexturesUpdate && !bNumBrushNodesChanged;
+		const bool bPreserveTextures = !bNumBrushNodesChanged;
 		UpdatePolys(bPreserveTextures);
-		bSkipTexturesUpdate = false;
 	}
 
 	if (GetOwner()->IsSelected() && !WasSelected)
@@ -1027,7 +1020,7 @@ void UAkSurfaceReflectorSetComponent::GetTexturesAndSurfaceAreas(TArray<FAkAcous
 				if (Poly.Texture)
 				{
 					surfaceAreas.Add(Poly.GetSurfaceArea() / AkComponentHelpers::UnrealUnitsPerSquaredMeter(this));
-					const FAkAcousticTextureParams* params = AkSettings->GetTextureParams(Poly.Texture->AcousticTextureCookedData.ShortId);
+					const FAkAcousticTextureParams* params = AkSettings->GetTextureParams(Poly.Texture->GetShortID());
 					if (params != nullptr)
 					{
 						textures.Add(*params);
@@ -1066,7 +1059,15 @@ void UAkSurfaceReflectorSetComponent::SendSurfaceReflectorSet()
 		TArray<AkAcousticSurface> SurfacesToSend;
 		TArray<AkTriangle> TrianglesToSend;
 		TArray< TSharedPtr< decltype(StringCast<ANSICHAR>(TEXT(""))) > > SurfaceNames;
-		FString ParentName = GetOwner()->GetName();
+		
+		FString ParentName;
+#if WITH_EDITOR
+		ParentName = GetOwner()->GetActorLabel();
+#else
+		ParentName = GetOwner()->GetName();
+#endif
+
+
 		// Some clarifications: 
 		// - All of the brush's vertices are held in the UModel->Verts array (elements of type FVert)
 		// - FVert contains pVertex, which points to the UModel->Points array (actual coords of the point in actor space)
@@ -1205,7 +1206,7 @@ void UAkSurfaceReflectorSetComponent::HandleObjectsReplaced(const TMap<UObject*,
 bool UAkSurfaceReflectorSetComponent::ContainsTexture(const FGuid& textureID)
 {
 	for (const FAkSurfacePoly& Poly : AcousticPolys)
-		if (Poly.Texture != nullptr && Poly.Texture->AcousticTextureInfo.AssetGuid == textureID)
+		if (Poly.Texture != nullptr && Poly.Texture->AcousticTextureInfo.WwiseGuid == textureID)
 			return true;
 	return false;
 }
@@ -1213,8 +1214,8 @@ bool UAkSurfaceReflectorSetComponent::ContainsTexture(const FGuid& textureID)
 void UAkSurfaceReflectorSetComponent::RegisterAllTextureParamCallbacks()
 {
 	for (const FAkSurfacePoly& Poly : AcousticPolys)
-		if (Poly.Texture != nullptr && TextureDelegateHandles.Find(Poly.Texture->AcousticTextureInfo.AssetGuid) == nullptr)
-			RegisterTextureParamChangeCallback(Poly.Texture->AcousticTextureInfo.AssetGuid);
+		if (Poly.Texture != nullptr && TextureDelegateHandles.Find(Poly.Texture->AcousticTextureInfo.WwiseGuid) == nullptr)
+			RegisterTextureParamChangeCallback(Poly.Texture->AcousticTextureInfo.WwiseGuid);
 }
 
 TWeakObjectPtr<UPhysicalMaterial> AssignPolygonTexturesFromSamples(const TArray<FVector>& Vertices, const TArray<FVector>& Points, const TArray<FVector>& Normals, const TArray< TWeakObjectPtr<UPhysicalMaterial> >& Materials, int Num)
@@ -1348,12 +1349,11 @@ void UAkSurfaceReflectorSetComponent::AssignAcousticTexturesFromSamples(const TA
 			}
 		}
 		if (AcousticPolys[NodeIdx].Texture != nullptr)
-			RegisterTextureParamChangeCallback(AcousticPolys[NodeIdx].Texture->AcousticTextureInfo.AssetGuid);
+			RegisterTextureParamChangeCallback(AcousticPolys[NodeIdx].Texture->AcousticTextureInfo.WwiseGuid);
 	}
 
 	OnRefreshDetails.ExecuteIfBound();
 	// Update text visualizers.
-	SkipNextTexturesUpdate();
 	SchedulePolysUpdate();
 }
 
